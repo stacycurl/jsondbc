@@ -1,12 +1,8 @@
 package jsondbc
 
-import argonaut.{Json, JsonMonocle, JsonObject, JsonObjectMonocle}
-import argonaut.Json._
+import argonaut.Json
 import io.gatling.jsonpath.AST._
 import io.gatling.jsonpath._
-import jsondbc.SPI.Aux
-import jsondbc.syntax.Descendant.Predicate
-import jsondbc.syntax.{CanPrismFrom, Descendant}
 import jsondbc.util.Extractor
 import monocle._
 import monocle.function.{Each, FilterIndex}
@@ -16,8 +12,6 @@ import scala.language.{dynamics, higherKinds, implicitConversions}
 
 
 case object JsonPath {
-  import jsondbc.syntax.argonaut._
-
   def traversal(path: String): Traversal[Json, Json] = traversal(Traversal.id[Json], path)
   def ancestors(path: String): List[(String, Traversal[Json, Json])] = ancestors(Traversal.id[Json], path)
 
@@ -36,27 +30,7 @@ case object JsonPath {
   }
 
   private class JsonPathIntegration[A] {
-    object spi {
-      val jNull: Json = Json.jNull
-      def jBoolean(value: Boolean): Json = Json.jBool(value)
-      def jDouble(value: Double): Json = Json.jNumberOrNull(value)
-      def jLong(value: Long): Json = Json.jNumber(value)
-      def jString(value: String): Json = Json.jString(value)
-      def jField(json: Json, name: String): Option[Json] = json.field(name)
-
-      implicit val ordering: Ordering[Json] = {
-        Ordering.Tuple4[Option[Boolean], Option[Int], Option[Double], Option[String]].on[Json](json ⇒ {
-          (json.bool, json.number.flatMap(_.toInt), json.number.flatMap(_.toDouble), json.string)
-        })
-      }
-
-      val jObjectPrism:       Prism[Json, JsonObject]               = JsonMonocle.jObjectPrism
-      val jArrayPrism:        Prism[Json, List[Json]]               = JsonMonocle.jArrayPrism
-      val objectValuesOrArrayElements: Traversal[Json, Json]        = Descendant.objectValuesOrArrayElements
-
-      val jObjectEach:        Each[JsonObject, Json]                = JsonObjectMonocle.jObjectEach
-      val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectMonocle.jObjectFilterIndex
-    }
+    private val spi = SPI[Json]
 
     def traversal(tokens: List[PathToken], start: Traversal[A, Json]): Traversal[A, Json] = tokens.foldLeft(start)(step)
 
