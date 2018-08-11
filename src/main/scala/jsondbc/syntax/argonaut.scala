@@ -20,8 +20,8 @@ object argonaut {
       Descendant(self, List(Traversal.id[Json]), () => List("" -> Traversal.id[Json]))
 
     def descendant(paths: String*): Descendant[Json, Json, Json] = Descendant(self,
-      paths.map(jsondbc.JsonPath.traversal)(collection.breakOut),
-      () => paths.flatMap(jsondbc.JsonPath.ancestors)(collection.breakOut)
+      paths.map(jsondbc.JsonPath.traversal[Json])(collection.breakOut),
+      () => paths.flatMap(jsondbc.JsonPath.ancestors[Json])(collection.breakOut)
     )
 
     def compact:                             Json = filterNulls
