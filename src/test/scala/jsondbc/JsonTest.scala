@@ -65,32 +65,31 @@ class JsonTest extends FreeSpec with JsonUtil {
   }
 
   "descendant_values" in {
-    jobj.descendant("age").getAll <=> List(age)
-    jobj.descendant("age").modify(_ ⇒ redacted) <=> ("age" → redacted) ->: jobj
+    jobj.descendant("$.age").getAll <=> List(age)
+    jobj.descendant("$.age").modify(_ ⇒ redacted) <=> ("age" → redacted) ->: jobj
 
-    jobj.descendant("{name, age}").getAll <=> List(name, age)
-    jobj.descendant("{name, age}").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj
+    jobj.descendant("$.name", "$.age").getAll <=> List(name, age)
+    jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj
 
-    jobj.descendant("age").int.getAll <=> List(3)
-    jobj.descendant("age").int.modify(_ * 2) <=> ("age" → jNumber(6)) ->: jobj
+    jobj.descendant("$.age").int.getAll <=> List(3)
+    jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jNumber(6)) ->: jobj
   }
 
   "descendant_multiple" in {
-    jobj.descendant("name", "age").getAll <=> List(name, age)
   }
 
   "descendant_elements" in {
-    jArray(fields).descendant("[0, 2]").getAll <=> List(lying, address)
+    jArray(fields).descendant("$[0, 2]").getAll <=> List(lying, address)
 
-    jArray(fields).descendant("[0, 2]").modify(_ ⇒ redacted) <=> jArrayElements(
+    jArray(fields).descendant("$[0, 2]").modify(_ ⇒ redacted) <=> jArrayElements(
       redacted, name, redacted, age, width, preferences, potatoes, knownUnknowns, awkward
     )
   }
 
   "descendant_all" in {
-    jobj.descendant("*").getAll <=> List(name, age, lying, address, preferences, width, potatoes, knownUnknowns, awkward)
+    jobj.descendant("$.*").getAll <=> List(name, age, lying, address, preferences, width, potatoes, knownUnknowns, awkward)
 
-    jobj.descendant("*").modify(_ ⇒ jString("redacted")) <=> jObjectFields(
+    jobj.descendant("$.*").modify(_ ⇒ jString("redacted")) <=> jObjectFields(
       "name" → redacted, "age" → redacted, "lying" → redacted, "address" → redacted, "preferences" → redacted,
       "width" → redacted, "potatoes" → redacted, "knownUnknowns" → redacted, "awkward" → redacted
     )
@@ -101,12 +100,6 @@ class JsonTest extends FreeSpec with JsonUtil {
       "$"                     -> Json.jArray(jobj.descendant("$").getAll),
       "$.preferences"         -> Json.jArray(jobj.descendant("$.preferences").getAll),
       "$.preferences.bananas" -> Json.jArray(jobj.descendant("$.preferences.bananas").getAll)
-    )
-
-    jobj.descendant("preferences/bananas").string.ancestors <=> jObjectFields(
-      ""                    -> Json.jArray(jobj.descendant("").getAll),
-      "preferences"         -> Json.jArray(jobj.descendant("preferences").getAll),
-      "preferences/bananas" -> Json.jArray(jobj.descendant("preferences/bananas").getAll)
     )
   }
 
@@ -122,12 +115,12 @@ class JsonTest extends FreeSpec with JsonUtil {
   }
 
   "descendant_complex" in {
-    jobj.descendant("preferences/*").bool.set(false)
-        .descendant("address").array.string.modify("Flat B" :: _)
-        .descendant("address/*").string.modify(_.toUpperCase)
-        .descendant("potatoes/*/variety").string.modify(_ ⇒ "Avalanche")
-        .descendant("knownUnknowns/*").int.modify(_ ⇒ 42)
-        .descendant("awkward/*").string.modify(_.toUpperCase) <=> parse("""
+    jobj.descendant("$.preferences.*").bool.set(false)
+        .descendant("$.address").array.string.modify("Flat B" :: _)
+        .descendant("$.address[*]").string.modify(_.toUpperCase)
+        .descendant("$.potatoes.*.variety").string.modify(_ ⇒ "Avalanche")
+        .descendant("$.knownUnknowns.*").int.modify(_ ⇒ 42)
+        .descendant("$.awkward.*").string.modify(_.toUpperCase) <=> parse("""
           |{
           |  "name" : "Eric",
           |  "lying" : true,
@@ -327,11 +320,11 @@ class JsonTest extends FreeSpec with JsonUtil {
   }
 
   "descendant_renameFields" in {
-    parse("""{ "thing": { "original": true } }""").descendant("thing").renameFields("original" -> "renamed") <=> parse("""{ "thing": { "renamed": true } }""")
+    parse("""{ "thing": { "original": true } }""").descendant("$.thing").renameFields("original" -> "renamed") <=> parse("""{ "thing": { "renamed": true } }""")
   }
 
   "descendant_obj_renameFields" in {
-    parse("""{ "thing": { "original": true } }""").descendant("thing").obj.renameFields("original" -> "renamed") <=> parse("""{ "thing": { "renamed": true } }""")
+    parse("""{ "thing": { "original": true } }""").descendant("$.thing").obj.renameFields("original" -> "renamed") <=> parse("""{ "thing": { "renamed": true } }""")
   }
 
   "renameFields" in {
@@ -339,11 +332,11 @@ class JsonTest extends FreeSpec with JsonUtil {
   }
 
   "descendant_renameManyFields" in {
-    parse("""{ "thing": { "a": true, "b": false} }""").descendant("thing").renameFields("a" → "A", "b" → "B") <=> parse("""{ "thing": { "A": true, "B": false} }""")
+    parse("""{ "thing": { "a": true, "b": false} }""").descendant("$.thing").renameFields("a" → "A", "b" → "B") <=> parse("""{ "thing": { "A": true, "B": false} }""")
   }
 
   "descendant_obj_renameManyFields" in {
-    parse("""{ "thing": { "a": true, "b": false} }""").descendant("thing").obj.renameFields("a" → "A", "b" → "B") <=> parse("""{ "thing": { "A": true, "B": false} }""")
+    parse("""{ "thing": { "a": true, "b": false} }""").descendant("$.thing").obj.renameFields("a" → "A", "b" → "B") <=> parse("""{ "thing": { "A": true, "B": false} }""")
   }
 
   "renameManyFields" in {
@@ -353,7 +346,7 @@ class JsonTest extends FreeSpec with JsonUtil {
   "descendant_addIfMissing" in {
     on(
       parse("""{ "thing": {} }"""),           parse("""{ "thing": {"a": true} }""")
-    ).calling(_.descendant("thing").addIfMissing("a" := jFalse)).produces(
+    ).calling(_.descendant("$.thing").addIfMissing("a" := jFalse)).produces(
       parse("""{ "thing": {"a": false} }"""), parse("""{ "thing": {"a": true} }""")
     )
   }
@@ -361,7 +354,7 @@ class JsonTest extends FreeSpec with JsonUtil {
   "descendant_obj_addIfMissing" in {
     on(
       parse("""{ "thing": {} }"""),           parse("""{ "thing": {"a": true} }""")
-    ).calling(_.descendant("thing").obj.addIfMissing("a" := jFalse)).produces(
+    ).calling(_.descendant("$.thing").obj.addIfMissing("a" := jFalse)).produces(
       parse("""{ "thing": {"a": false} }"""), parse("""{ "thing": {"a": true} }""")
     )
   }
@@ -378,7 +371,7 @@ class JsonTest extends FreeSpec with JsonUtil {
     on(
       thing(jEmptyObject),         thing(obj("a" := existing)),
       thing(obj("b" := existing)), thing(obj("a" := existing, "b" := existing))
-    ).calling(_.descendant("thing").addIfMissing("a" := added, "b" := added)).produces(
+    ).calling(_.descendant("$.thing").addIfMissing("a" := added, "b" := added)).produces(
       thing(obj("a" := added, "b" := added)),    thing(obj("a" := existing, "b" := added)),
       thing(obj("a" := added, "b" := existing)), thing(obj("a" := existing, "b" := existing))
     )
@@ -388,7 +381,7 @@ class JsonTest extends FreeSpec with JsonUtil {
     on(
       thing(jEmptyObject),         thing(obj("a" := existing)),
       thing(obj("b" := existing)), thing(obj("a" := existing, "b" := existing))
-    ).calling(_.descendant("thing").obj.addIfMissing("a" := added, "b" := added)).produces(
+    ).calling(_.descendant("$.thing").obj.addIfMissing("a" := added, "b" := added)).produces(
       thing(obj("a" := added, "b" := added)),    thing(obj("a" := existing, "b" := added)),
       thing(obj("a" := added, "b" := existing)), thing(obj("a" := existing, "b" := existing))
     )

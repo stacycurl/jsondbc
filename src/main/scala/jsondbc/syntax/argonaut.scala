@@ -1,19 +1,12 @@
 package jsondbc.syntax
 
-import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
 import _root_.argonaut.Json._
 import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
-
-import monocle.std.list.{listEach, listFilterIndex}
-import monocle.function.Each
-import monocle.function.FilterIndex
+import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
 import monocle._
-
-import io.gatling.jsonpath.AST._
-import io.gatling.jsonpath._
-
+import monocle.function.{Each, FilterIndex}
+import monocle.std.list.listEach
 import scalaz.{Applicative, \/}
-
 
 import scala.collection.immutable.{Map => ▶:}
 import scala.language.{dynamics, higherKinds, implicitConversions}
@@ -27,8 +20,8 @@ object argonaut {
       Descendant(self, List(Traversal.id[Json]), () => List("" -> Traversal.id[Json]))
 
     def descendant(paths: String*): Descendant[Json, Json, Json] = Descendant(self,
-      paths.map(Descendant.Descender.traversal)(collection.breakOut),
-      () => paths.flatMap(Descendant.Descender.ancestors)(collection.breakOut)
+      paths.map(jsondbc.JsonPath.traversal)(collection.breakOut),
+      () => paths.flatMap(jsondbc.JsonPath.ancestors)(collection.breakOut)
     )
 
     def compact:                             Json = filterNulls
@@ -190,7 +183,7 @@ object argonaut {
       self composeIso Iso[Json, Json](_.renameFields(fromTos: _*))(_.renameFields(fromTos.map(_.swap): _*))
 
     def descendant(path: String): Traversal[A, Json] =
-      Descendant.Descender(path).traversal(self, path)
+      jsondbc.JsonPath.traversal(self, path)
   }
 
   implicit class JsonArrayFrills(val self: List[Json]) extends AnyVal {
@@ -201,7 +194,7 @@ object argonaut {
 object Descendant {
   type Predicate[A] = A => Boolean
 
-  import argonaut.{JsonFrills, JsonObjectFrills, TraversalFrills}
+  import argonaut.{JsonFrills, JsonObjectFrills}
 
 //  implicit def descendantAsApplyTraversal[From, Via, To](descendant: Descendant[From, Via, To]):
 //    ApplyTraversal[From, From, To, To] = ApplyTraversal(descendant.from, descendant.traversal)
@@ -256,183 +249,10 @@ object Descendant {
       self.ancestorsFn().map { case (k, ancestor) => k -> ancestor.getAll(self.from) }
   }
 
-  object Descender {
-    def apply(path: String): Descender = if (path.startsWith("$")) JsonPath else Pimpathon
-
-    def traversal(path: String): Traversal[Json, Json] = apply(path).traversal(Traversal.id[Json], path)
-    def ancestors(path: String): List[(String, Traversal[Json, Json])] = apply(path).ancestors(Traversal.id[Json], path)
-  }
-
-  sealed trait Descender {
-    def descendant[A](from: A, start: Traversal[A, Json], path: String): Descendant[A, Json, Json] =
-      Descendant(from, List(traversal(start, path)), () => ancestors(start, path))
-
-    def traversal[A](from: Traversal[A, Json], path: String): Traversal[A, Json]
-    def ancestors[A](from: Traversal[A, Json], path: String): List[(String, Traversal[A, Json])]
-  }
-
-  case object JsonPath extends Descender {
-    def traversal[A](from: Traversal[A, Json], path: String): Traversal[A, Json] = {
-      new Parser().compile(path) match {
-        case Parser.Success(pathTokens, _) ⇒ new JsonPathIntegration().traversal(pathTokens, from)
-        case Parser.NoSuccess(msg, _)      ⇒ sys.error(s"Could not parse json path: $path, $msg")
-      }
-    }
-
-    def ancestors[A](from: Traversal[A, Json], path: String): List[(String, Traversal[A, Json])] = {
-      new Parser().compile(path) match {
-        case Parser.Success(pathTokens, _) ⇒ new JsonPathIntegration().ancestors(pathTokens, from)
-        case Parser.NoSuccess(msg, _)      ⇒ sys.error(s"Could not parse json path: $path, $msg")
-      }
-    }
-
-    private class JsonPathIntegration[A] {
-      def traversal(tokens: List[PathToken], start: Traversal[A, Json]): Traversal[A, Json] = tokens.foldLeft(start)(step)
-
-      def ancestors(tokens: List[PathToken], start: Traversal[A, Json]): List[(String, Traversal[A, Json])] = {
-        val traversals = tokens.scanLeft(start)(step)
-
-        anotate(tokens, traversals).tail
-      }
-
-      private def step(acc: Traversal[A, Json], token: PathToken): Traversal[A, Json] = token match {
-        case RecursiveField(name)           ⇒ notSupported(s"RecursiveField($name)")
-        case RootNode                       ⇒ acc
-        case AnyField                       ⇒ acc.obj composeTraversal Each.each
-        case MultiField(names)              ⇒ acc.obj composeTraversal FilterIndex.filterIndex(names.toSet: Set[String])
-        case Field(name)                    ⇒ acc.obj composeTraversal FilterIndex.filterIndex(Set(name))
-        case RecursiveAnyField              ⇒ notSupported("RecursiveAnyField")
-        case CurrentNode                    ⇒ acc
-        case FILTER_TOKEN(predicate)        ⇒ filterArrayOrObject(predicate)(acc)
-        case ArraySlice(None, None, 1)      ⇒ acc.array composeTraversal Each.each
-        case ArraySlice(begin, end, step)   ⇒ notSupported(s"ArraySlice($begin, $end, $step)")
-        case ArrayRandomAccess(indecies)    ⇒ acc.array composeTraversal FilterIndex.filterIndex(indecies.toSet: Set[Int])
-        case RecursiveFilterToken(filter)   ⇒ notSupported(s"RecursiveFilterToken($filter)")
-      }
-
-      private val FILTER_TOKEN: Extractor[FilterToken, Predicate[Json]] = Extractor.pf[FilterToken, Predicate[Json]] {
-        case ComparisonFilter(CMP_OP(op), JFN(lhs),          JFN(rhs))          ⇒ json => op(lhs(json), rhs(json))
-        case BooleanFilter(op,            FILTER_TOKEN(lhs), FILTER_TOKEN(rhs)) ⇒ json => op(lhs(json), rhs(json))
-        case HasFilter(SubQuery(CurrentNode :: tokens))                         ⇒ subQuery(tokens, Some(_)).andThen(_.isDefined)
-      }
-
-      private val CMP_OP: Extractor[ComparisonOperator, (Option[Json], Option[Json]) => Boolean] = {
-        Extractor.pf[ComparisonOperator, (Option[Json], Option[Json]) => Boolean] {
-          case cmp: ComparisonWithOrderingOperator ⇒ cmp.compare[Option[Json]]
-          case op: ComparisonOperator              ⇒ op.apply
-        }
-      }
-
-      private trait Extractor[F, T] {
-        def unapply(f: F): Option[T]
-      }
-
-      private object Extractor {
-        def pf[F, T](pf: PartialFunction[F, T]): Extractor[F, T] = new Extractor[F, T] {
-          def unapply(f: F): Option[T] = pf.lift(f)
-        }
-      }
-
-      private type JFN = Json ⇒ Option[Json]
-
-      private val JFN: Extractor[FilterValue, JFN] = Extractor.pf[FilterValue, JFN] {
-        case SubQuery(CurrentNode :: tokens) ⇒ subQuery(tokens, json ⇒ Some(json))
-        case JPTrue                          ⇒ _ ⇒ Some(jTrue)
-        case JPFalse                         ⇒ _ ⇒ Some(jFalse)
-        case JPDouble(value)                 ⇒ _ ⇒ Some(Json.jNumberOrNull(value))
-        case JPLong(value)                   ⇒ _ ⇒ Some(Json.jNumber(value))
-        case JPString(value)                 ⇒ _ ⇒ Some(jString(value))
-        case JPNull                          ⇒ _ ⇒ Some(jNull)
-        case other                           ⇒ notSupported(other)
-      }
-
-      private def subQuery(tokens: List[PathToken], acc: JFN): JFN = tokens match {
-        case Nil                             ⇒ acc
-        case Field(name)             :: tail ⇒ subQuery(tail, acc.andThen(_.flatMap(_.field(name))))
-        case FILTER_TOKEN(predicate) :: tail ⇒ subQuery(tail, acc.andThen(_.filter(predicate.apply)))
-        case other                           ⇒ notSupported(other)
-      }
-
-      private def notSupported[X](x: X): Nothing = sys.error(s"$x not supported !")
-
-      private def filterArrayOrObject(predicate: Predicate[Json])(acc: Traversal[A, Json]): Traversal[A, Json] =
-        acc composeTraversal objectValuesOrArrayElements composePrism filterObjectP(predicate)
-
-      private def anotate(tokens: List[PathToken], traversals: List[Traversal[A, Json]]): List[(String, Traversal[A, Json])] = {
-        tokens.map(toString).inits.map(_.mkString("")).toList.reverse.zip(traversals)
-      }
-
-      private def toString(token: PathToken): String = token match {
-        case RootNode                             ⇒ "$"
-        case AnyField                             ⇒ ".*"
-        case MultiField(names)                    ⇒ names.map(s => s"\'$s\'").mkString(", ")
-        case Field(name)                          ⇒ s".$name"
-        case CurrentNode                          ⇒ "@"
-        case ComparisonFilter(op, lhs, rhs)       ⇒ s"?(${toString(lhs)} ${toString(op)} ${toString(rhs)})"
-        case HasFilter(SubQuery(subTokens))       ⇒ subTokens.map(toString).mkString("")
-        case ArraySlice(None, None, 1)            ⇒ "[*]"
-        case ArrayRandomAccess(indecies)          ⇒ indecies.mkString(", ")
-        case BooleanFilter(AndOperator, lhs, rhs) ⇒ s"${toString(lhs)} && ${toString(rhs)}"
-        case BooleanFilter(OrOperator, lhs, rhs)  ⇒ s"${toString(lhs)} || ${toString(rhs)}"
-        case _                                    ⇒ ???
-      }
-
-      private def toString(op: ComparisonOperator): String = op match {
-        case EqOperator          ⇒ "=="
-        case NotEqOperator       ⇒ "!="
-        case GreaterOrEqOperator ⇒ ">="
-        case LessOperator        ⇒ "<"
-        case LessOrEqOperator    ⇒ "<="
-        case GreaterOperator     ⇒ ">"
-      }
-
-      private def toString(fv: FilterValue): String = fv match {
-        case JPTrue           ⇒ "true"
-        case JPFalse          ⇒ "false"
-        case JPLong(value)    ⇒ value.toString
-        case JPString(value)  ⇒ value.map(s => s"\'$s\'").mkString(", ")
-        case SubQuery(tokens) ⇒ tokens.map(toString).mkString("")
-        case _                ⇒ sys.error(fv.toString)
-      }
-    }
-  }
-
-  case object Pimpathon extends Descender {
-    def traversal[A](start: Traversal[A, Json], path: String): Traversal[A, Json] =
-      path.split("/").toList.filter(_.nonEmpty).foldLeft(start)(step)
-
-    def ancestors[A](start: Traversal[A, Json], path: String): List[(String, Traversal[A, Json])] = {
-      val tokens:     List[String]             = path.split("/").toList.filter(_.nonEmpty)
-      val traversals: List[Traversal[A, Json]] = tokens.scanLeft(start)(step)
-
-      tokens.inits.map(_.mkString("/")).toList.reverse.zip(traversals)
-    }
-
-    private def step[A](acc: Traversal[A, Json], token: String): Traversal[A, Json] = token match {
-      case "*"                            ⇒ acc composeTraversal objectValuesOrArrayElements
-      case r"""\*\[${key}='${value}'\]""" ⇒ acc.array composeTraversal Each.each composePrism filterObject(key, jString(value))
-      case r"""\[${Split(indices)}\]"""   ⇒ acc.array composeTraversal FilterIndex.filterIndex(indices.map(_.toInt))
-      case r"""\{${Split(keys)}\}"""      ⇒ acc.obj composeTraversal FilterIndex.filterIndex(keys)
-      case key                            ⇒ acc.obj composeTraversal FilterIndex.filterIndex(Set(key))
-    }
-
-    private def filterObject(key: String, value: Json): Prism[Json, Json] =
-      filterObjectP(_.field(key).contains(value))
-
-    private implicit class RegexMatcher(val self: StringContext) extends AnyVal { def r = self.parts.mkString("(.+)").r }
-    private object Split { def unapply(value: String): Option[Set[String]] = Some(value.split(",").map(_.trim).toSet) }
-  }
-
-  private implicit val orderingJson: Ordering[Json] = {
-    Ordering.Tuple4[Option[Boolean], Option[Int], Option[Double], Option[String]].on[Json](json ⇒ {
-      (json.bool, json.number.flatMap(_.toInt), json.number.flatMap(_.toDouble), json.string)
-    })
-  }
-
-  private def filterObjectP(p: Predicate[Json]): Prism[Json, Json] =
+  def filterObjectP(p: Predicate[Json]): Prism[Json, Json] =
     Prism[Json, Json](json ⇒ Some(json).filter(p))(json ⇒ json)
 
-  private final lazy val objectValuesOrArrayElements: Traversal[Json, Json] = new PTraversal[Json, Json, Json, Json] {
+  val objectValuesOrArrayElements: Traversal[Json, Json] = new PTraversal[Json, Json, Json, Json] {
     def modifyF[F[_]](f: Json ⇒ F[Json])(j: Json)(implicit F: Applicative[F]): F[Json] = j.fold(
       jsonNull   = F.pure(j), jsonBool = _ ⇒ F.pure(j), jsonNumber = _ ⇒ F.pure(j), jsonString = _ ⇒ F.pure(j),
       jsonArray  = arr ⇒ F.map(Each.each[List[Json], Json].modifyF(f)(arr))(Json.array(_: _*)),
