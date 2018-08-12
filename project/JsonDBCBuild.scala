@@ -18,11 +18,17 @@ object JsonDBCBuild extends Build {
       libraryDependencies <++= scalaVersion(dependencies("2.12.3" → List(
         "org.scala-lang"             % "scala-compiler"    % "2.12.3" exclude("org.scala-lang.modules", "scala-xml_2.12"),
         "org.scala-lang"             % "scala-library"     % "2.12.3"    % "test",
-        "com.github.julien-truffaut" %% "monocle-core"     % "1.3.2"     % "provided",
-        "io.argonaut"                %% "argonaut"         % "6.2-RC1"   % "provided",
-        "io.argonaut"                %% "argonaut-monocle" % "6.2-RC1"   % "provided",
+        "com.github.julien-truffaut" %% "monocle-core"     % "1.5.0"     % "provided",
+
+        "io.argonaut"                %% "argonaut"         % "6.2.2"   % "provided",
+        "io.argonaut"                %% "argonaut-monocle" % "6.2.2"   % "provided",
         "org.scalaz"                 %% "scalaz-core"      % "7.3.0-M6"  % "provided",
+
         "io.gatling"                 %% "jsonpath"         % "0.6.8"     % "provided",
+
+        "io.circe"                   %% "circe-core"       % "0.9.3",
+        "io.circe"                   % "circe-optics_2.12" % "0.9.3",
+
         "com.novocode"               % "junit-interface"   % "0.11"      % "test",
         "com.github.stacycurl"       %% "delta-matchers"   % "1.1.0"     % "test",
         "co.fs2"                     %% "fs2-core"         % "0.10.2"    % "test"

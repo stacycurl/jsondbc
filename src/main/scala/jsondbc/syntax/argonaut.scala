@@ -5,7 +5,6 @@ import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
 import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
 import monocle._
 import monocle.function.{Each, FilterIndex}
-import monocle.std.list.listEach
 import scalaz.{Applicative, \/}
 
 import scala.collection.immutable.{Map => ▶:}

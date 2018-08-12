@@ -1,17 +1,16 @@
 package jsondbc
 
-import argonaut.{JsonMonocle, JsonObjectMonocle}
 import jsondbc.SPI.Aux
 import jsondbc.syntax.Descendant
 import monocle.function.{Each, FilterIndex}
-import monocle.{Prism, Traversal}
+import monocle.{Iso, PIso, Prism, Traversal}
 
 trait SPI[Json] {
   type JsonObject
 
   def jNull: Json
   def jBoolean(value: Boolean): Json
-  def jDouble(value: Double): Json
+  def jDouble(value: Double): Option[Json]
   def jLong(value: Long): Json
   def jString(value: String): Json
   def jField(json: Json, name: String): Option[Json]
@@ -34,13 +33,14 @@ object SPI extends ArgonautSPI {
 
 trait ArgonautSPI {
   import argonaut.{Json, JsonObject}
+  import argonaut.{JsonMonocle, JsonObjectMonocle}
 
   implicit val argonautSPI: Aux[Json, JsonObject] = new SPI[Json] {
     type JsonObject = argonaut.JsonObject
 
     val jNull: Json = Json.jNull
     def jBoolean(value: Boolean): Json = Json.jBool(value)
-    def jDouble(value: Double): Json = Json.jNumberOrNull(value)
+    def jDouble(value: Double): Option[Json] = Json.jNumber(value)
     def jLong(value: Long): Json = Json.jNumber(value)
     def jString(value: String): Json = Json.jString(value)
     def jField(json: Json, name: String): Option[Json] = json.field(name)
@@ -57,5 +57,38 @@ trait ArgonautSPI {
 
     val jObjectEach:        Each[JsonObject, Json]                = JsonObjectMonocle.jObjectEach
     val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectMonocle.jObjectFilterIndex
+  }
+}
+
+trait CirceSPI {
+  import io.circe.{Json, JsonObject}
+  import io.circe.optics.{JsonOptics, JsonObjectOptics}
+
+  implicit val circeSPI: Aux[Json, JsonObject] = new SPI[Json] {
+    type JsonObject = io.circe.JsonObject
+
+    val jNull: Json = Json.Null
+    def jBoolean(value: Boolean): Json = Json.fromBoolean(value)
+    def jDouble(value: Double): Option[Json] = Json.fromDouble(value)
+    def jLong(value: Long): Json = Json.fromLong(value)
+    def jString(value: String): Json = Json.fromString(value)
+
+    def jField(json: Json, name: String): Option[Json] = for {
+      obj <- json.asObject
+      field <- obj(name)
+    } yield field
+
+    val ordering: Ordering[Json] = {
+      Ordering.Tuple4[Option[Boolean], Option[Int], Option[Double], Option[String]].on[Json](json ⇒ {
+        (json.asBoolean, json.asNumber.flatMap(_.toInt), json.asNumber.map(_.toDouble), json.asString)
+      })
+    }
+
+    val jObjectPrism:       Prism[Json, JsonObject]               = JsonOptics.jsonObject
+    val jArrayPrism:        Prism[Json, List[Json]]               = JsonOptics.jsonArray composeIso Iso[Vector[Json], List[Json]](_.toList)(_.toVector)
+    val objectValuesOrArrayElements: Traversal[Json, Json]        = JsonOptics.jsonDescendants
+
+    val jObjectEach:        Each[JsonObject, Json]                = JsonObjectOptics.jsonObjectEach
+    val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectOptics.jsonObjectFilterIndex
   }
 }
