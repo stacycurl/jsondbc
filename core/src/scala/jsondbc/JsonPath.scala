@@ -3,8 +3,8 @@ package jsondbc
 import io.gatling.jsonpath.AST._
 import io.gatling.{jsonpath => JP}
 import jsondbc.util.Extractor
-import monocle.function.{Each, FilterIndex}
 import monocle.{Prism, Traversal}
+import monocle.function.{Each, FilterIndex}
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
 

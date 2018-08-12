@@ -1,6 +1,5 @@
 package jsondbc.util
 
-
 trait Extractor[A, B] {
   def unapply(a: A): Option[B]
 }

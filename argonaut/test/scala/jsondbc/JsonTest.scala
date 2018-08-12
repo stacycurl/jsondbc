@@ -1,13 +1,13 @@
 package jsondbc
 
 import argonaut.Json._
-import argonaut._
 import argonaut.StringWrap.StringToStringWrap
+import argonaut._
+import jsondbc.syntax.argonaut._
 import org.scalatest.{FreeSpec, FreeSpecLike}
 import sjc.delta.argonaut.json.actualExpected.flat._
 import sjc.delta.argonaut.matchers._
 import sjc.delta.matchers.syntax.anyDeltaMatcherOps
-import jsondbc.syntax.argonaut._
 
 class JsonTest extends FreeSpec with JsonUtil {
   "booleanFilter" in {

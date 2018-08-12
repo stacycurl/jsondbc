@@ -3,6 +3,7 @@ package jsondbc.syntax
 import _root_.argonaut.Json._
 import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
 import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
+import jsondbc.ArgonautSPI
 import monocle._
 import monocle.function.{Each, FilterIndex}
 import scalaz.{Applicative, \/}
@@ -11,7 +12,7 @@ import scala.collection.immutable.{Map => ▶:}
 import scala.language.{dynamics, higherKinds, implicitConversions}
 
 
-object argonaut {
+object argonaut extends ArgonautSPI {
   type Predicate[A] = A => Boolean
 
   implicit class JsonFrills(val self: Json) extends AnyVal {
