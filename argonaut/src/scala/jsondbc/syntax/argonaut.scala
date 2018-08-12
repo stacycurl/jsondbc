@@ -8,13 +8,10 @@ import monocle._
 import monocle.function.{Each, FilterIndex}
 import scalaz.{Applicative, \/}
 
-import scala.collection.immutable.{Map => ▶:}
 import scala.language.{dynamics, higherKinds, implicitConversions}
 
 
 object argonaut extends ArgonautSPI {
-  type Predicate[A] = A => Boolean
-
   implicit class JsonFrills(val self: Json) extends AnyVal {
     def descendant: Descendant[Json, Json, Json] =
       Descendant(self, List(Traversal.id[Json]), () => List("" -> Traversal.id[Json]))
@@ -26,10 +23,10 @@ object argonaut extends ArgonautSPI {
 
     def compact:                             Json = filterNulls
     def filterNulls:                         Json = filterR(_ != jNull)
-    def filterKeys(p: Predicate[String]):    Json = self.withObject(_.filterKeys(p))
-    def filterKeysNot(p: Predicate[String]): Json = self.withObject(_.filterKeysNot(p))
-    def filterValues(p: Predicate[Json]):    Json = self.withObject(_.filterValues(p))
-    def filterValuesNot(p: Predicate[Json]): Json = self.withObject(_.filterValuesNot(p))
+    def filterKeys(p: String => Boolean):    Json = self.withObject(_.filterKeys(p))
+    def filterKeysNot(p: String => Boolean): Json = self.withObject(_.filterKeysNot(p))
+    def filterValues(p: Json => Boolean):    Json = self.withObject(_.filterValues(p))
+    def filterValuesNot(p: Json => Boolean): Json = self.withObject(_.filterValuesNot(p))
 
     def mapValuesWithKey(f: String => Json => Json): Json = self.withObject(_.mapValuesWithKey(f))
 
@@ -47,7 +44,7 @@ object argonaut extends ArgonautSPI {
 //      }
 //    }
 
-    def filterR(p: Predicate[Json]): Json = if (p(self)) {
+    def filterR(p: Json => Boolean): Json = if (p(self)) {
       self.withObject(_.filterR(p)).withArray(_.filterR(p))
     } else {
       jNull
@@ -71,12 +68,12 @@ object argonaut extends ArgonautSPI {
       CodecJson.derived[B](f(self.Encoder), g(self.Decoder))
   }
 
-  implicit class CodecJsonMapFrills[K, V](val self: CodecJson[K ▶: V]) extends AnyVal {
-    def xmapEntries[C, W](kvcw: (K, V) ⇒ (C, W))(cwkv: (C, W) ⇒ (K, V)): CodecJson[C ▶: W] =
-      self.derived[C ▶: W](_ contramapEntries cwkv)(_ mapEntries kvcw)
+  implicit class CodecJsonMapFrills[K, V](val self: CodecJson[Map[K, V]]) extends AnyVal {
+    def xmapEntries[C, W](kvcw: (K, V) ⇒ (C, W))(cwkv: (C, W) ⇒ (K, V)): CodecJson[Map[C, W]] =
+      self.derived[Map[C, W]](_ contramapEntries cwkv)(_ mapEntries kvcw)
 
-    def xmapKeys[C](kc: K ⇒ C)(ck: C ⇒ K):   CodecJson[C ▶: V] = self.derived(_ contramapKeys ck)(_ mapKeys kc)
-    def xmapValues[W](vw: V ⇒ W)(wv: W ⇒ V): CodecJson[K ▶: W] = self.derived(_ contramapValues wv)(_ mapValues vw)
+    def xmapKeys[C](kc: K ⇒ C)(ck: C ⇒ K):   CodecJson[Map[C, V]] = self.derived(_ contramapKeys ck)(_ mapKeys kc)
+    def xmapValues[W](vw: V ⇒ W)(wv: W ⇒ V): CodecJson[Map[K, W]] = self.derived(_ contramapValues wv)(_ mapValues vw)
   }
 
   implicit class DecodeJsonFrills[A](val self: DecodeJson[A]) extends AnyVal {
@@ -92,13 +89,13 @@ object argonaut extends ArgonautSPI {
       DecodeJson[B](c ⇒ self.decode(c).flatMap(a ⇒ DecodeResult[B](f(a).leftMap(_ → c.history).toEither)))
   }
 
-  implicit class DecodeJsonMapFrills[K, V](val self: DecodeJson[K ▶: V]) extends AnyVal {
-    def mapEntries[C, W](f: (K, V) ⇒ (C, W)): DecodeJson[C ▶: W] = self.map(_.map {
+  implicit class DecodeJsonMapFrills[K, V](val self: DecodeJson[Map[K, V]]) extends AnyVal {
+    def mapEntries[C, W](f: (K, V) ⇒ (C, W)): DecodeJson[Map[C, W]] = self.map(_.map {
       case (k, v) => f(k, v)
     })
 
-    def mapKeys[C](f: K ⇒ C):   DecodeJson[C ▶: V] = self.map(_.map { case (k, v) => f(k) -> v })
-    def mapValues[W](f: V ⇒ W): DecodeJson[K ▶: W] = self.map(_.map { case (k, v) => k -> f(v) })
+    def mapKeys[C](f: K ⇒ C):   DecodeJson[Map[C, V]] = self.map(_.map { case (k, v) => f(k) -> v })
+    def mapValues[W](f: V ⇒ W): DecodeJson[Map[K, W]] = self.map(_.map { case (k, v) => k -> f(v) })
   }
 
   implicit class EncodeJsonFrills[A](val self: EncodeJson[A]) extends AnyVal {
@@ -117,13 +114,13 @@ object argonaut extends ArgonautSPI {
     private[argonaut] def beforeEncode[B](f: B ⇒ A): EncodeJson[B] = self contramap f // Probably publish later
   }
 
-  implicit class EncodeJsonMapFrills[K, V](val self: EncodeJson[K ▶: V]) extends AnyVal {
-    def contramapEntries[C, W](f: (C, W) ⇒ (K, V)): EncodeJson[C ▶: W] = self.contramap[C ▶: W](_.map {
+  implicit class EncodeJsonMapFrills[K, V](val self: EncodeJson[Map[K, V]]) extends AnyVal {
+    def contramapEntries[C, W](f: (C, W) ⇒ (K, V)): EncodeJson[Map[C, W]] = self.contramap[Map[C, W]](_.map {
       case (k, v) => f(k, v)
     })
 
-    def contramapKeys[C](f: C ⇒ K):   EncodeJson[C ▶: V] = self.contramap[C ▶: V](_.map { case (k, v) => f(k) -> v })
-    def contramapValues[W](f: W ⇒ V): EncodeJson[K ▶: W] = self.contramap[K ▶: W](_.map { case (k, v) => k -> f(v) })
+    def contramapKeys[C](f: C ⇒ K):   EncodeJson[Map[C, V]] = self.contramap[Map[C, V]](_.map { case (k, v) => f(k) -> v })
+    def contramapValues[W](f: W ⇒ V): EncodeJson[Map[K, W]] = self.contramap[Map[K, W]](_.map { case (k, v) => k -> f(v) })
   }
 
   implicit class TraversalFrills[A, B](val self: Traversal[A, B]) extends AnyVal {
@@ -147,10 +144,10 @@ object argonaut extends ArgonautSPI {
 
   implicit class JsonObjectFrills(val self: JsonObject) extends AnyVal {
     def removeFields(names: String*):        JsonObject = filterKeysNot(names.toSet)
-    def filterKeys(p: Predicate[String]):    JsonObject = mapMap(_.filterKeys(p))
-    def filterKeysNot(p: Predicate[String]): JsonObject = mapMap(_.filterNot(kv ⇒ p(kv._1)))
-    def filterValues(p: Predicate[Json]):    JsonObject = mapMap(_.filter(kv ⇒ p(kv._2)))
-    def filterValuesNot(p: Predicate[Json]): JsonObject = mapMap(_.filterNot(kv ⇒ p(kv._2)))
+    def filterKeys(p: String => Boolean):    JsonObject = mapMap(_.filterKeys(p))
+    def filterKeysNot(p: String => Boolean): JsonObject = mapMap(_.filterNot(kv ⇒ p(kv._1)))
+    def filterValues(p: Json => Boolean):    JsonObject = mapMap(_.filter(kv ⇒ p(kv._2)))
+    def filterValuesNot(p: Json => Boolean): JsonObject = mapMap(_.filterNot(kv ⇒ p(kv._2)))
 
     def mapValuesWithKey(f: String => Json => Json): JsonObject = mapMap(_.map { case (k, v) => (k, f(k)(v)) })
 
@@ -170,7 +167,7 @@ object argonaut extends ArgonautSPI {
       self(name).fold(self + (name, value))(_ ⇒ self)
 
 
-    def filterR(p: Predicate[Json]): JsonObject = mapMap(_.collect {
+    def filterR(p: Json => Boolean): JsonObject = mapMap(_.collect {
       case (k, j) if p(j) => k -> j.filterR(p)
     })
 
@@ -187,13 +184,11 @@ object argonaut extends ArgonautSPI {
   }
 
   implicit class JsonArrayFrills(val self: List[Json]) extends AnyVal {
-    def filterR(p: Predicate[Json]): List[Json] = self.collect { case j if p(j) ⇒ j.filterR(p) }
+    def filterR(p: Json => Boolean): List[Json] = self.collect { case j if p(j) ⇒ j.filterR(p) }
   }
 }
 
 object Descendant {
-  type Predicate[A] = A => Boolean
-
   import argonaut.{JsonFrills, JsonObjectFrills}
 
 //  implicit def descendantAsApplyTraversal[From, Via, To](descendant: Descendant[From, Via, To]):
@@ -206,10 +201,10 @@ object Descendant {
 
     def removeFields(names: String*): From = self.modify(_.removeFields(names: _*))
 
-    def filterKeys(predicate: Predicate[String]): From = self.modify(_.filterKeys(predicate))
-    def filterKeysNot(predicate: Predicate[String]): From = self.modify(_.filterKeysNot(predicate))
-    def filterValues(predicate: Predicate[Json]): From = self.modify(_.filterValues(predicate))
-    def filterValuesNot(predicate: Predicate[Json]): From = self.modify(_.filterValuesNot(predicate))
+    def filterKeys(predicate: String => Boolean): From = self.modify(_.filterKeys(predicate))
+    def filterKeysNot(predicate: String => Boolean): From = self.modify(_.filterKeysNot(predicate))
+    def filterValues(predicate: Json => Boolean): From = self.modify(_.filterValues(predicate))
+    def filterValuesNot(predicate: Json => Boolean): From = self.modify(_.filterValuesNot(predicate))
 
     def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
 
@@ -223,10 +218,10 @@ object Descendant {
 
     def removeFields(names: String*): From = self.modify(_.removeFields(names: _*))
 
-    def filterKeys(predicate: Predicate[String]): From = self.modify(_.filterKeys(predicate))
-    def filterKeysNot(predicate: Predicate[String]): From = self.modify(_.filterKeysNot(predicate))
-    def filterValues(predicate: Predicate[Json]): From = self.modify(_.filterValues(predicate))
-    def filterValuesNot(predicate: Predicate[Json]): From = self.modify(_.filterValuesNot(predicate))
+    def filterKeys(predicate: String => Boolean): From = self.modify(_.filterKeys(predicate))
+    def filterKeysNot(predicate: String => Boolean): From = self.modify(_.filterKeysNot(predicate))
+    def filterValues(predicate: Json => Boolean): From = self.modify(_.filterValues(predicate))
+    def filterValuesNot(predicate: Json => Boolean): From = self.modify(_.filterValuesNot(predicate))
 
     def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
 
@@ -249,7 +244,7 @@ object Descendant {
       self.ancestorsFn().map { case (k, ancestor) => k -> ancestor.getAll(self.from) }
   }
 
-  def filterObjectP(p: Predicate[Json]): Prism[Json, Json] =
+  def filterObjectP(p: Json => Boolean): Prism[Json, Json] =
     Prism[Json, Json](json ⇒ Some(json).filter(p))(json ⇒ json)
 
   val objectValuesOrArrayElements: Traversal[Json, Json] = new PTraversal[Json, Json, Json, Json] {
@@ -317,13 +312,13 @@ case class CanPrismFrom[From, Elem, To](prism: Prism[From, To]) {
   def toList: CanPrismFrom[List[From], Elem, List[To]] =
     CanPrismFrom(Prism[List[From], List[To]](la ⇒ Some(la.flatMap(prism.getOption)))(_.map(prism.reverseGet)))
 
-  // def updateValues[W](f: V ⇒ Option[W]): K ▶: W = self.flatMap(kv ⇒ f(kv._2).map(kv._1 → _))
-  def toMap[K]: CanPrismFrom[K ▶: From, Elem, K ▶: To] = CanPrismFrom(Prism[K ▶: From, K ▶: To](mapKA ⇒ {
+  // def updateValues[W](f: V ⇒ Option[W]): Map[K, W] = self.flatMap(kv ⇒ f(kv._2).map(kv._1 → _))
+  def toMap[K]: CanPrismFrom[Map[K, From], Elem, Map[K, To]] = CanPrismFrom(Prism[Map[K, From], Map[K, To]](mapKA ⇒ {
     Some(for {
       (k, v) <- mapKA
       to    <- prism.getOption(v)
     } yield k -> to)
-  })((mapKB: K ▶: To) ⇒ {
+  })((mapKB: Map[K, To]) ⇒ {
     mapKB.map {
       case (k, v) => k -> prism.reverseGet(v)
     }
@@ -355,11 +350,11 @@ object CanPrismFrom {
     : CanPrismFrom[List[From], Elem, List[To]] = cpf.toList
 
   implicit def cpfm[From, Elem, To](implicit cpf: CanPrismFrom[From, Elem, To])
-    : CanPrismFrom[String ▶: From, Elem, String ▶: To] = cpf.toMap
+    : CanPrismFrom[Map[String, From], Elem, Map[String, To]] = cpf.toMap
 
   implicit def cpfJsonObjectToTypedMap[V](implicit cpf: CanPrismFrom[Json, V, V])
-    : CanPrismFrom[JsonObject, V, String ▶: V] = apply(jsonObjectMapIso.composePrism(cpf.toMap[String].prism))
+    : CanPrismFrom[JsonObject, V, Map[String, V]] = apply(jsonObjectMapIso.composePrism(cpf.toMap[String].prism))
 
-  private val jsonObjectMapIso: Iso[JsonObject, String ▶: Json] =
-    Iso[JsonObject, String ▶: Json](_.toMap)(map ⇒ JsonObject.fromTraversableOnce(map))
+  private val jsonObjectMapIso: Iso[JsonObject, Map[String, Json]] =
+    Iso[JsonObject, Map[String, Json]](_.toMap)(map ⇒ JsonObject.fromTraversableOnce(map))
 }
