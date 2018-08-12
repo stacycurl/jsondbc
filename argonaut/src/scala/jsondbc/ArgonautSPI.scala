@@ -41,20 +41,7 @@ trait ArgonautSPI {
     val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectMonocle.jObjectFilterIndex
   }
 
-
-  implicit val cpfJsonToBoolean:    CanPrismFrom[Json, Boolean,    Boolean]    = CanPrismFrom(argonautSPI.jBoolean)
-//  implicit val cpfJsonToJsonNumber: CanPrismFrom[Json, argonaut.JsonNumber, argonaut.JsonNumber] = CanPrismFrom(argonautSPI.jNumberPrism)
-  implicit val cpfJsonToString:     CanPrismFrom[Json, String,     String]     = CanPrismFrom(argonautSPI.jString)
-  implicit val cpfJsonToJsonArray:  CanPrismFrom[Json, List[Json], List[Json]] = CanPrismFrom(argonautSPI.jArray)
   implicit val cpfJsonToJsonObject: CanPrismFrom[Json, JsonObject, JsonObject] = CanPrismFrom(argonautSPI.jObject)
-  implicit val cpfJsonToBigDecimal: CanPrismFrom[Json, BigDecimal, BigDecimal] = CanPrismFrom(argonautSPI.jBigDecimal)
-//  implicit val cpfJsonToDouble:     jsondbc.CanPrismFrom[Json, Double,     Double]     = CanPrismFrom(jDoublePrism)
-//  implicit val cpfJsonToFloat:      jsondbc.CanPrismFrom[Json, Float,      Float]      = CanPrismFrom(jFloatPrism)
-  implicit val cpfJsonToBigInt:     CanPrismFrom[Json, BigInt,     BigInt]     = CanPrismFrom(argonautSPI.jBigInt)
-  implicit val cpfJsonToLong:       CanPrismFrom[Json, Long,       Long]       = CanPrismFrom(argonautSPI.jLong)
-  implicit val cpfJsonToInt:        CanPrismFrom[Json, Int,        Int]        = CanPrismFrom(argonautSPI.jInt)
-  implicit val cpfJsonToShort:      CanPrismFrom[Json, Short,      Short]      = CanPrismFrom(argonautSPI.jShort)
-  implicit val cpfJsonToByte:       CanPrismFrom[Json, Byte,       Byte]       = CanPrismFrom(argonautSPI.jByte)
 
   implicit def cpfJsonToCodec[A: CodecJson]: CanPrismFrom[Json, A, A] = {
     val A = CodecJson.derived[A]

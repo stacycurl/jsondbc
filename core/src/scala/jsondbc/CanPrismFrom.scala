@@ -21,6 +21,16 @@ case class CanPrismFrom[From, Elem, To](prism: Prism[From, To]) {
 }
 
 object CanPrismFrom {
+  implicit def cpfJsonToBoolean[Json](implicit spi: SPI[Json]):    CanPrismFrom[Json, Boolean,    Boolean]    = apply(spi.jBoolean)
+  implicit def cpfJsonToString[Json](implicit spi: SPI[Json]):     CanPrismFrom[Json, String,     String]     = CanPrismFrom(spi.jString)
+  implicit def cpfJsonToJsonArray[Json](implicit spi: SPI[Json]):  CanPrismFrom[Json, List[Json], List[Json]] = CanPrismFrom(spi.jArray)
+  implicit def cpfJsonToBigDecimal[Json](implicit spi: SPI[Json]): CanPrismFrom[Json, BigDecimal, BigDecimal] = CanPrismFrom(spi.jBigDecimal)
+  implicit def cpfJsonToBigInt[Json](implicit spi: SPI[Json]):     CanPrismFrom[Json, BigInt,     BigInt]     = CanPrismFrom(spi.jBigInt)
+  implicit def cpfJsonToLong[Json](implicit spi: SPI[Json]):       CanPrismFrom[Json, Long,       Long]       = CanPrismFrom(spi.jLong)
+  implicit def cpfJsonToInt[Json](implicit spi: SPI[Json]):        CanPrismFrom[Json, Int,        Int]        = CanPrismFrom(spi.jInt)
+  implicit def cpfJsonToShort[Json](implicit spi: SPI[Json]):      CanPrismFrom[Json, Short,      Short]      = CanPrismFrom(spi.jShort)
+  implicit def cpfJsonToByte[Json](implicit spi: SPI[Json]):       CanPrismFrom[Json, Byte,       Byte]       = CanPrismFrom(spi.jByte)
+
   implicit def cpfl[From, Elem, To](
     implicit cpf: CanPrismFrom[From, Elem, To]
   ): CanPrismFrom[List[From], Elem, List[To]] = cpf.toList
