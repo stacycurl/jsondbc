@@ -2,8 +2,8 @@ package jsondbc.syntax
 
 import _root_.argonaut.Json._
 import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
-import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
-import jsondbc.ArgonautSPI
+import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonNumber, JsonObject}
+import jsondbc.{ArgonautSPI, CanPrismFrom, SPI}
 import monocle._
 import monocle.function.{Each, FilterIndex}
 import scalaz.{Applicative, \/}
@@ -12,15 +12,17 @@ import scala.language.{dynamics, higherKinds, implicitConversions}
 
 
 object argonaut extends ArgonautSPI {
-  implicit class JsonFrills(val self: Json) extends AnyVal {
-    def descendant: Descendant[Json, Json, Json] =
-      Descendant(self, List(Traversal.id[Json]), () => List("" -> Traversal.id[Json]))
+  implicit class AnyFrills[A](val self: A) extends AnyVal {
+    def descendant(implicit spi: SPI[A]): Descendant[A, A, A] =
+      Descendant(self, List(Traversal.id[A]), () => List("" -> Traversal.id[A]))
 
-    def descendant(paths: String*): Descendant[Json, Json, Json] = Descendant(self,
-      paths.map(jsondbc.JsonPath.traversal[Json])(collection.breakOut),
-      () => paths.flatMap(jsondbc.JsonPath.ancestors[Json])(collection.breakOut)
+    def descendant(paths: String*)(implicit spi: SPI[A]): Descendant[A, A, A] = Descendant(self,
+      paths.map(jsondbc.JsonPath.traversal[A])(collection.breakOut),
+      () => paths.flatMap(jsondbc.JsonPath.ancestors[A])(collection.breakOut)
     )
+  }
 
+  implicit class JsonFrills(val self: Json) extends AnyVal {
     def compact:                             Json = filterNulls
     def filterNulls:                         Json = filterR(_ != jNull)
     def filterKeys(p: String => Boolean):    Json = self.withObject(_.filterKeys(p))
@@ -306,55 +308,4 @@ case class Descendant[From, Via, To](
 
   private def withTraversal[That](fn: Traversal[From, To] => Traversal[From, That]): Descendant[From, Via, That] =
     copy(traversals = traversals.map(fn))
-}
-
-case class CanPrismFrom[From, Elem, To](prism: Prism[From, To]) {
-  def toList: CanPrismFrom[List[From], Elem, List[To]] =
-    CanPrismFrom(Prism[List[From], List[To]](la ⇒ Some(la.flatMap(prism.getOption)))(_.map(prism.reverseGet)))
-
-  // def updateValues[W](f: V ⇒ Option[W]): Map[K, W] = self.flatMap(kv ⇒ f(kv._2).map(kv._1 → _))
-  def toMap[K]: CanPrismFrom[Map[K, From], Elem, Map[K, To]] = CanPrismFrom(Prism[Map[K, From], Map[K, To]](mapKA ⇒ {
-    Some(for {
-      (k, v) <- mapKA
-      to    <- prism.getOption(v)
-    } yield k -> to)
-  })((mapKB: Map[K, To]) ⇒ {
-    mapKB.map {
-      case (k, v) => k -> prism.reverseGet(v)
-    }
-  }))
-}
-
-object CanPrismFrom {
-  implicit val cpfJsonToBoolean:    CanPrismFrom[Json, Boolean,    Boolean]    = apply(JsonMonocle.jBoolPrism)
-  implicit val cpfJsonToJsonNumber: CanPrismFrom[Json, JsonNumber, JsonNumber] = apply(JsonMonocle.jNumberPrism)
-  implicit val cpfJsonToString:     CanPrismFrom[Json, String,     String]     = apply(JsonMonocle.jStringPrism)
-  implicit val cpfJsonToJsonArray:  CanPrismFrom[Json, List[Json], List[Json]] = apply(JsonMonocle.jArrayPrism)
-  implicit val cpfJsonToJsonObject: CanPrismFrom[Json, JsonObject, JsonObject] = apply(JsonMonocle.jObjectPrism)
-  implicit val cpfJsonToBigDecimal: CanPrismFrom[Json, BigDecimal, BigDecimal] = apply(JsonMonocle.jBigDecimalPrism)
-//  implicit val cpfJsonToDouble:     CanPrismFrom[Json, Double,     Double]     = apply(jDoublePrism)
-//  implicit val cpfJsonToFloat:      CanPrismFrom[Json, Float,      Float]      = apply(jFloatPrism)
-  implicit val cpfJsonToBigInt:     CanPrismFrom[Json, BigInt,     BigInt]     = apply(JsonMonocle.jBigIntPrism)
-  implicit val cpfJsonToLong:       CanPrismFrom[Json, Long,       Long]       = apply(JsonMonocle.jLongPrism)
-  implicit val cpfJsonToInt:        CanPrismFrom[Json, Int,        Int]        = apply(JsonMonocle.jIntPrism)
-  implicit val cpfJsonToShort:      CanPrismFrom[Json, Short,      Short]      = apply(JsonMonocle.jShortPrism)
-  implicit val cpfJsonToByte:       CanPrismFrom[Json, Byte,       Byte]       = apply(JsonMonocle.jBytePrism)
-
-  implicit def cpfJsonToCodec[A: CodecJson]: CanPrismFrom[Json, A, A] = {
-    val A = CodecJson.derived[A]
-
-    apply(Prism[Json, A](json => A.decodeJson(json).toOption)(A.encode))
-  }
-
-  implicit def cpfl[From, Elem, To](implicit cpf: CanPrismFrom[From, Elem, To])
-    : CanPrismFrom[List[From], Elem, List[To]] = cpf.toList
-
-  implicit def cpfm[From, Elem, To](implicit cpf: CanPrismFrom[From, Elem, To])
-    : CanPrismFrom[Map[String, From], Elem, Map[String, To]] = cpf.toMap
-
-  implicit def cpfJsonObjectToTypedMap[V](implicit cpf: CanPrismFrom[Json, V, V])
-    : CanPrismFrom[JsonObject, V, Map[String, V]] = apply(jsonObjectMapIso.composePrism(cpf.toMap[String].prism))
-
-  private val jsonObjectMapIso: Iso[JsonObject, Map[String, Json]] =
-    Iso[JsonObject, Map[String, Json]](_.toMap)(map ⇒ JsonObject.fromTraversableOnce(map))
 }
