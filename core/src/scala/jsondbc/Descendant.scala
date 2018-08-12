@@ -1,0 +1,44 @@
+package jsondbc
+
+import scala.language.{dynamics, higherKinds, implicitConversions}
+
+import monocle.{Iso, Optional, Prism, Traversal}
+
+
+
+case class Descendant[From, Via, To](
+  from: From, traversals: List[Traversal[From, To]], ancestorsFn: () => List[(String, Traversal[From, Via])]
+) extends Dynamic {
+  def bool[That](  implicit cpf: CanPrismFrom[To, Boolean,    That]): Descendant[From, Via, That] = apply(cpf)
+  def string[That](implicit cpf: CanPrismFrom[To, String,     That]): Descendant[From, Via, That] = apply(cpf)
+
+  def double[That](    implicit cpf: CanPrismFrom[To, Double,     That]): Descendant[From, Via, That] = apply(cpf)
+  def int[That](       implicit cpf: CanPrismFrom[To, Int,        That]): Descendant[From, Via, That] = apply(cpf)
+  def float[That](     implicit cpf: CanPrismFrom[To, Float,      That]): Descendant[From, Via, That] = apply(cpf)
+  def short[That](     implicit cpf: CanPrismFrom[To, Short,      That]): Descendant[From, Via, That] = apply(cpf)
+  def byte[That](      implicit cpf: CanPrismFrom[To, Byte,       That]): Descendant[From, Via, That] = apply(cpf)
+  def bigDecimal[That](implicit cpf: CanPrismFrom[To, BigDecimal, That]): Descendant[From, Via, That] = apply(cpf)
+  def bigInt[That](    implicit cpf: CanPrismFrom[To, BigInt,     That]): Descendant[From, Via, That] = apply(cpf)
+
+  private def apply[Elem, That](cpf: CanPrismFrom[To, Elem, That]): Descendant[From, Via, That] = composePrism(cpf.prism)
+
+  def composePrism[That](next: Prism[To, That]):         Descendant[From, Via, That] = withTraversal(_ composePrism next)
+  def composeTraversal[That](next: Traversal[To, That]): Descendant[From, Via, That] = withTraversal(_ composeTraversal next)
+  def composeOptional[That](next: Optional[To, That]):   Descendant[From, Via, That] = withTraversal(_ composeOptional next)
+  def composeIso[That](next: Iso[To, That]):             Descendant[From, Via, That] = withTraversal(_ composeIso next)
+
+  def headOption: Option[To] = traversals.flatMap(_.headOption(from)).headOption
+  def headOrElse(alternative: => To): To = headOption.getOrElse(alternative)
+
+  def getAll: List[To] = traversals.flatMap(_.getAll(from))
+
+  def set(to: To):         From = foldLeft(_.set(to))
+  def modify(f: To => To): From = foldLeft(_.modify(f))
+
+  private def foldLeft(f: Traversal[From, To] => From => From): From = traversals.foldLeft(from) {
+    case (acc, traversal) => f(traversal)(acc)
+  }
+
+  private def withTraversal[That](fn: Traversal[From, To] => Traversal[From, That]): Descendant[From, Via, That] =
+    copy(traversals = traversals.map(fn))
+}

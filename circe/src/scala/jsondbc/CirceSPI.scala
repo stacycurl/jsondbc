@@ -4,7 +4,6 @@ import io.circe.optics.{JsonObjectOptics, JsonOptics}
 import io.circe.{Json, JsonObject}
 import monocle.function.{Each, FilterIndex}
 import monocle.{Iso, Prism, Traversal}
-
 import jsondbc.SPI.Aux
 
 
@@ -12,12 +11,7 @@ object CirceSPI extends CirceSPI
 trait CirceSPI {
   implicit val circeSPI: Aux[Json, JsonObject] = new SPI[Json] {
     type JsonObject = io.circe.JsonObject
-
-    val jNull: Json = Json.Null
-    def jBoolean(value: Boolean): Json = Json.fromBoolean(value)
-    def jDouble(value: Double): Option[Json] = Json.fromDouble(value)
-    def jLong(value: Long): Json = Json.fromLong(value)
-    def jString(value: String): Json = Json.fromString(value)
+    type JsonNumber = io.circe.JsonNumber
 
     def jField(json: Json, name: String): Option[Json] = for {
       obj <- json.asObject
@@ -30,10 +24,22 @@ trait CirceSPI {
       })
     }
 
-    val jObjectPrism:       Prism[Json, JsonObject]               = JsonOptics.jsonObject
-    val jArrayPrism:        Prism[Json, List[Json]]               = JsonOptics.jsonArray composeIso Iso[Vector[Json], List[Json]](_.toList)(_.toVector)
-    val objectValuesOrArrayElements: Traversal[Json, Json]        = JsonOptics.jsonDescendants
+    val jNull:       Prism[Json, Unit]       = JsonOptics.jsonNull
+    val jObject:     Prism[Json, JsonObject] = JsonOptics.jsonObject
+    val jArray:      Prism[Json, List[Json]] = JsonOptics.jsonArray composeIso Iso[Vector[Json], List[Json]](_.toList)(_.toVector)
+    val jBoolean:    Prism[Json, Boolean]    = JsonOptics.jsonBoolean
+    val jNumber:     Prism[Json, JsonNumber] = JsonOptics.jsonNumber
+    val jDouble:     Prism[Json, Double]     = JsonOptics.jsonDouble
+    val jString:     Prism[Json, String]     = JsonOptics.jsonString
+    val jBigDecimal: Prism[Json, BigDecimal] = JsonOptics.jsonBigDecimal
+    val jBigInt:     Prism[Json, BigInt]     = JsonOptics.jsonBigInt
+    val jLong:       Prism[Json, Long]       = JsonOptics.jsonLong
+    val jInt:        Prism[Json, Int]        = JsonOptics.jsonInt
+    val jShort:      Prism[Json, Short]      = JsonOptics.jsonShort
+    val jByte:       Prism[Json, Byte]       = JsonOptics.jsonByte
 
+
+    val jDescendants:       Traversal[Json, Json]   = JsonOptics.jsonDescendants
     val jObjectEach:        Each[JsonObject, Json]                = JsonObjectOptics.jsonObjectEach
     val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectOptics.jsonObjectFilterIndex
   }

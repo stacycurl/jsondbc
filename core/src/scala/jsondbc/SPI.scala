@@ -6,20 +6,27 @@ import monocle.function.{Each, FilterIndex}
 
 trait SPI[Json] {
   type JsonObject
+  type JsonNumber
 
-  def jNull: Json
-  def jBoolean(value: Boolean): Json
-  def jDouble(value: Double): Option[Json]
-  def jLong(value: Long): Json
-  def jString(value: String): Json
   def jField(json: Json, name: String): Option[Json]
 
   val ordering: Ordering[Json]
 
-  def jObjectPrism:       Prism[Json, JsonObject]
-  def jArrayPrism:        Prism[Json, List[Json]]
-  def objectValuesOrArrayElements: Traversal[Json, Json]
+  def jNull:       Prism[Json, Unit]
+  def jObject:     Prism[Json, JsonObject]
+  def jArray:      Prism[Json, List[Json]]
+  def jBoolean:    Prism[Json, Boolean]
+  def jNumber:     Prism[Json, JsonNumber]
+  def jDouble:     Prism[Json, Double]
+  def jString:     Prism[Json, String]
+  def jBigDecimal: Prism[Json, BigDecimal]
+  def jBigInt:     Prism[Json, BigInt]
+  def jLong:       Prism[Json, Long]
+  def jInt:        Prism[Json, Int]
+  def jShort:      Prism[Json, Short]
+  def jByte:       Prism[Json, Byte]
 
+  def jDescendants:       Traversal[Json, Json]
   def jObjectEach:        Each[JsonObject, Json]
   def jObjectFilterIndex: FilterIndex[JsonObject, String, Json]
 }

@@ -42,15 +42,15 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
   private def step(acc: Traversal[A, Json], token: PathToken): Traversal[A, Json] = token match {
     case RecursiveField(name)           ⇒ notSupported(s"RecursiveField($name)")
     case RootNode                       ⇒ acc
-    case AnyField                       ⇒ acc composePrism spi.jObjectPrism composeTraversal Each.each(spi.jObjectEach)
-    case MultiField(names)              ⇒ acc composePrism spi.jObjectPrism composeTraversal FilterIndex.filterIndex(names.toSet: Set[String])(spi.jObjectFilterIndex)
-    case Field(name)                    ⇒ acc composePrism spi.jObjectPrism composeTraversal FilterIndex.filterIndex(Set(name))(spi.jObjectFilterIndex)
+    case AnyField                       ⇒ acc composePrism spi.jObject composeTraversal Each.each(spi.jObjectEach)
+    case MultiField(names)              ⇒ acc composePrism spi.jObject composeTraversal FilterIndex.filterIndex(names.toSet: Set[String])(spi.jObjectFilterIndex)
+    case Field(name)                    ⇒ acc composePrism spi.jObject composeTraversal FilterIndex.filterIndex(Set(name))(spi.jObjectFilterIndex)
     case RecursiveAnyField              ⇒ notSupported("RecursiveAnyField")
     case CurrentNode                    ⇒ acc
     case FILTER_TOKEN(predicate)        ⇒ filterArrayOrObject(predicate)(acc)
-    case ArraySlice(None, None, 1)      ⇒ acc composePrism spi.jArrayPrism composeTraversal Each.each(Each.listEach)
+    case ArraySlice(None, None, 1)      ⇒ acc composePrism spi.jArray composeTraversal Each.each(Each.listEach)
     case ArraySlice(begin, end, step)   ⇒ notSupported(s"ArraySlice($begin, $end, $step)")
-    case ArrayRandomAccess(indecies)    ⇒ acc composePrism spi.jArrayPrism composeTraversal FilterIndex.filterIndex(indecies.toSet: Set[Int])(FilterIndex.listFilterIndex)
+    case ArrayRandomAccess(indecies)    ⇒ acc composePrism spi.jArray composeTraversal FilterIndex.filterIndex(indecies.toSet: Set[Int])(FilterIndex.listFilterIndex)
     case RecursiveFilterToken(filter)   ⇒ notSupported(s"RecursiveFilterToken($filter)")
   }
 
@@ -76,10 +76,10 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
     case SubQuery(CurrentNode :: tokens) ⇒ subQuery(tokens, json ⇒ Some(json))
     case JPTrue                          ⇒ _ ⇒ Some(spi.jBoolean(true))
     case JPFalse                         ⇒ _ ⇒ Some(spi.jBoolean(false))
-    case JPDouble(value)                 ⇒ _ ⇒ spi.jDouble(value)
+    case JPDouble(value)                 ⇒ _ ⇒ Some(spi.jDouble(value))
     case JPLong(value)                   ⇒ _ ⇒ Some(spi.jLong(value))
     case JPString(value)                 ⇒ _ ⇒ Some(spi.jString(value))
-    case JPNull                          ⇒ _ ⇒ Some(spi.jNull)
+    case JPNull                          ⇒ _ ⇒ Some(spi.jNull(()))
     case other                           ⇒ notSupported(other)
   }
 
@@ -93,7 +93,7 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
   private def notSupported[X](x: X): Nothing = sys.error(s"$x not supported !")
 
   private def filterArrayOrObject(predicate: Json => Boolean)(acc: Traversal[A, Json]): Traversal[A, Json] =
-    acc composeTraversal spi.objectValuesOrArrayElements composePrism predicatePrism(predicate)
+    acc composeTraversal spi.jDescendants composePrism predicatePrism(predicate)
 
   private def anotate(tokens: List[PathToken], traversals: List[Traversal[A, Json]]): List[(String, Traversal[A, Json])] =
     tokens.map(toString).inits.map(_.mkString("")).toList.reverse.zip(traversals)

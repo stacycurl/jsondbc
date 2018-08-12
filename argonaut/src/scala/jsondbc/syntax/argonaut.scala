@@ -2,11 +2,11 @@ package jsondbc.syntax
 
 import _root_.argonaut.Json._
 import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
-import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonNumber, JsonObject}
-import jsondbc.{ArgonautSPI, CanPrismFrom, SPI}
+import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
+import jsondbc.{ArgonautSPI, CanPrismFrom, Descendant, SPI}
 import monocle._
 import monocle.function.{Each, FilterIndex}
-import scalaz.{Applicative, \/}
+import scalaz.\/
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
 
@@ -20,6 +20,16 @@ object argonaut extends ArgonautSPI {
       paths.map(jsondbc.JsonPath.traversal[A])(collection.breakOut),
       () => paths.flatMap(jsondbc.JsonPath.ancestors[A])(collection.breakOut)
     )
+  }
+
+  implicit class DescendantFrills[From, Via, To](val self: Descendant[From, Via, To]) extends AnyVal {
+    def array[That]( implicit cpf: CanPrismFrom[To, List[Json], That]): Descendant[From, Via, That] = self.composePrism(cpf.prism)
+    def obj[That](   implicit cpf: CanPrismFrom[To, JsonObject, That]): Descendant[From, Via, That] = self.composePrism(cpf.prism)
+
+    def selectDynamic(key: String)(implicit cpf: CanPrismFrom[To, JsonObject, JsonObject]): Descendant[From, Via, Json] =
+      obj[JsonObject] composeTraversal FilterIndex.filterIndex(Set(key))
+
+    def as[A: CodecJson]: As[From, Via, To, A] = As[From, Via, To, A](self)
   }
 
   implicit class JsonFrills(val self: Json) extends AnyVal {
@@ -188,13 +198,6 @@ object argonaut extends ArgonautSPI {
   implicit class JsonArrayFrills(val self: List[Json]) extends AnyVal {
     def filterR(p: Json => Boolean): List[Json] = self.collect { case j if p(j) ⇒ j.filterR(p) }
   }
-}
-
-object Descendant {
-  import argonaut.{JsonFrills, JsonObjectFrills}
-
-//  implicit def descendantAsApplyTraversal[From, Via, To](descendant: Descendant[From, Via, To]):
-//    ApplyTraversal[From, From, To, To] = ApplyTraversal(descendant.from, descendant.traversal)
 
   implicit class DescendantToJsonFrills[From](self: Descendant[From, Json, Json]) {
     def renameFields(fromTos: (String, String)*): From = self.modify(_.renameFields(fromTos: _*))
@@ -210,7 +213,7 @@ object Descendant {
 
     def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
 
-    def each: Descendant[From, Json, Json] = self composeTraversal objectValuesOrArrayElements
+    def each: Descendant[From, Json, Json] = self composeTraversal JsonMonocle.jDescendants
   }
 
   implicit class DescendantToJsonObjectFrills[From](self: Descendant[From, Json, JsonObject]) {
@@ -249,63 +252,10 @@ object Descendant {
   def filterObjectP(p: Json => Boolean): Prism[Json, Json] =
     Prism[Json, Json](json ⇒ Some(json).filter(p))(json ⇒ json)
 
-  val objectValuesOrArrayElements: Traversal[Json, Json] = new PTraversal[Json, Json, Json, Json] {
-    def modifyF[F[_]](f: Json ⇒ F[Json])(j: Json)(implicit F: Applicative[F]): F[Json] = j.fold(
-      jsonNull   = F.pure(j), jsonBool = _ ⇒ F.pure(j), jsonNumber = _ ⇒ F.pure(j), jsonString = _ ⇒ F.pure(j),
-      jsonArray  = arr ⇒ F.map(Each.each[List[Json], Json].modifyF(f)(arr))(Json.array(_: _*)),
-      jsonObject = obj ⇒ F.map(Each.each[JsonObject, Json].modifyF(f)(obj))(Json.jObject)
-    )
-  }
-
   case class As[From, Via, To, A: CodecJson](from: Descendant[From, Via, To])
 
   object As {
     implicit def asToDescendant[From, Via, To, A, That](as: As[From, Via, To, A])
       (implicit cpf: CanPrismFrom[To, A, That]): Descendant[From, Via, That] = as.from.composePrism(cpf.prism)
   }
-}
-
-case class Descendant[From, Via, To](
-  from: From, traversals: List[Traversal[From, To]], ancestorsFn: () => List[(String, Traversal[From, Via])]
-) extends Dynamic {
-  def bool[That](  implicit cpf: CanPrismFrom[To, Boolean,    That]): Descendant[From, Via, That] = apply(cpf)
-  def number[That](implicit cpf: CanPrismFrom[To, JsonNumber, That]): Descendant[From, Via, That] = apply(cpf)
-  def string[That](implicit cpf: CanPrismFrom[To, String,     That]): Descendant[From, Via, That] = apply(cpf)
-  def array[That]( implicit cpf: CanPrismFrom[To, List[Json], That]): Descendant[From, Via, That] = apply(cpf)
-  def obj[That](   implicit cpf: CanPrismFrom[To, JsonObject, That]): Descendant[From, Via, That] = apply(cpf)
-
-  def double[That](    implicit cpf: CanPrismFrom[To, Double,     That]): Descendant[From, Via, That] = apply(cpf)
-  def int[That](       implicit cpf: CanPrismFrom[To, Int,        That]): Descendant[From, Via, That] = apply(cpf)
-  def float[That](     implicit cpf: CanPrismFrom[To, Float,      That]): Descendant[From, Via, That] = apply(cpf)
-  def short[That](     implicit cpf: CanPrismFrom[To, Short,      That]): Descendant[From, Via, That] = apply(cpf)
-  def byte[That](      implicit cpf: CanPrismFrom[To, Byte,       That]): Descendant[From, Via, That] = apply(cpf)
-  def bigDecimal[That](implicit cpf: CanPrismFrom[To, BigDecimal, That]): Descendant[From, Via, That] = apply(cpf)
-  def bigInt[That](    implicit cpf: CanPrismFrom[To, BigInt,     That]): Descendant[From, Via, That] = apply(cpf)
-
-  def as[A: CodecJson]: Descendant.As[From, Via, To, A] = Descendant.As[From, Via, To, A](this)
-
-  def selectDynamic(key: String)(implicit cpf: CanPrismFrom[To, JsonObject, JsonObject]): Descendant[From, Via, Json] =
-    obj[JsonObject] composeTraversal FilterIndex.filterIndex(Set(key))
-
-  private def apply[Elem, That](cpf: CanPrismFrom[To, Elem, That]): Descendant[From, Via, That] = composePrism(cpf.prism)
-
-  def composePrism[That](next: Prism[To, That]):         Descendant[From, Via, That] = withTraversal(_ composePrism next)
-  def composeTraversal[That](next: Traversal[To, That]): Descendant[From, Via, That] = withTraversal(_ composeTraversal next)
-  def composeOptional[That](next: Optional[To, That]):   Descendant[From, Via, That] = withTraversal(_ composeOptional next)
-  def composeIso[That](next: Iso[To, That]):             Descendant[From, Via, That] = withTraversal(_ composeIso next)
-
-  def headOption: Option[To] = traversals.flatMap(_.headOption(from)).headOption
-  def headOrElse(alternative: => To): To = headOption.getOrElse(alternative)
-
-  def getAll: List[To] = traversals.flatMap(_.getAll(from))
-
-  def set(to: To):         From = foldLeft(_.set(to))
-  def modify(f: To => To): From = foldLeft(_.modify(f))
-
-  private def foldLeft(f: Traversal[From, To] => From => From): From = traversals.foldLeft(from) {
-    case (acc, traversal) => f(traversal)(acc)
-  }
-
-  private def withTraversal[That](fn: Traversal[From, To] => Traversal[From, That]): Descendant[From, Via, That] =
-    copy(traversals = traversals.map(fn))
 }
