@@ -6,6 +6,22 @@ import org.scalatest.FreeSpecLike
 abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   import spi._
 
+  "filterKeys" in {
+    obj("a" -> jLong(123), "b" -> jLong(456)).filterKeys(_ == "a") <=> obj("a" -> jLong(123))
+  }
+
+  "filterKeysNot" in {
+    obj("a" -> jLong(123), "b" -> jLong(456)).filterKeysNot(_ == "a") <=> obj("b" -> jLong(456))
+  }
+
+  "filterValues" in {
+    obj("a" -> jLong(123), "b" -> jLong(456)).filterValues(_ == jLong(123)) <=> obj("a" -> jLong(123))
+  }
+
+  "filterValuesNot" in {
+    obj("a" -> jLong(123), "b" -> jLong(456)).filterValuesNot(_ == jLong(123)) <=> obj("b" -> jLong(456))
+  }
+
   "booleanFilter" in {
     val json = parse(
       """{

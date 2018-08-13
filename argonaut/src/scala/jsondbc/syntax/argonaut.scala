@@ -3,15 +3,13 @@ package jsondbc.syntax
 import _root_.argonaut.Json._
 import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
 import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
-import jsondbc.{ArgonautSPI, CanPrismFrom, Descendant, SPI}
+import jsondbc.syntax.generic._
+import jsondbc.{ArgonautSPI, CanPrismFrom, Descendant}
 import monocle._
 import monocle.function.{Each, FilterIndex}
 import scalaz.\/
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
-
-
-
 
 object argonaut extends ArgonautSPI {
 
@@ -28,10 +26,6 @@ object argonaut extends ArgonautSPI {
   implicit class JsonFrills(val self: Json) extends AnyVal {
     def compact:                             Json = filterNulls
     def filterNulls:                         Json = filterR(_ != jNull)
-    def filterKeys(p: String => Boolean):    Json = self.withObject(_.filterKeys(p))
-    def filterKeysNot(p: String => Boolean): Json = self.withObject(_.filterKeysNot(p))
-    def filterValues(p: Json => Boolean):    Json = self.withObject(_.filterValues(p))
-    def filterValuesNot(p: Json => Boolean): Json = self.withObject(_.filterValuesNot(p))
 
     def mapValuesWithKey(f: String => Json => Json): Json = self.withObject(_.mapValuesWithKey(f))
 

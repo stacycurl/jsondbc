@@ -38,6 +38,8 @@ trait CirceSPI {
     val jShort:      Prism[Json, Short]      = JsonOptics.jsonShort
     val jByte:       Prism[Json, Byte]       = JsonOptics.jsonByte
 
+    val jObjectMap:  Iso[JsonObject, Map[String, Json]] =
+      Iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromMap)
 
     val jDescendants:       Traversal[Json, Json]   = JsonOptics.jsonDescendants
     val jObjectEach:        Each[JsonObject, Json]                = JsonObjectOptics.jsonObjectEach

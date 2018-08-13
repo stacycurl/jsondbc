@@ -3,7 +3,7 @@ package jsondbc
 import argonaut.{CodecJson, Json, JsonMonocle, JsonObject, JsonObjectMonocle}
 import jsondbc.SPI.Aux
 import monocle.function.{Each, FilterIndex}
-import monocle.{Iso, Prism, Traversal}
+import monocle.{Iso, Lens, Prism, Traversal}
 
 object ArgonautSPI extends ArgonautSPI
 trait ArgonautSPI {
@@ -35,6 +35,9 @@ trait ArgonautSPI {
     val jDouble:     Prism[Json, Double] = Prism[Json, Double](_.fold(
       Some(Double.NaN), _ => None, _.toDouble, _ => None, _ => None, _ => None
     ))(Json.jNumberOrNull)
+
+    val jObjectMap: Iso[JsonObject, Map[String, Json]] =
+      Iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromTraversableOnce)
 
     val jDescendants:       Traversal[Json, Json]   = JsonMonocle.jDescendants
     val jObjectEach:        Each[JsonObject, Json]                = JsonObjectMonocle.jObjectEach
