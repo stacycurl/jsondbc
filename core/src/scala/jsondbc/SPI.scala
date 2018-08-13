@@ -4,35 +4,35 @@ import monocle.{Prism, Traversal}
 import monocle.function.{Each, FilterIndex}
 
 
-trait SPI[Json] {
+trait SPI[J] {
   type JsonObject
   type JsonNumber
 
-  def jField(json: Json, name: String): Option[Json]
+  def jField(json: J, name: String): Option[J]
 
-  val ordering: Ordering[Json]
+  val ordering: Ordering[J]
 
-  def jNull:       Prism[Json, Unit]
-  def jObject:     Prism[Json, JsonObject]
-  def jArray:      Prism[Json, List[Json]]
-  def jBoolean:    Prism[Json, Boolean]
-  def jNumber:     Prism[Json, JsonNumber]
-  def jDouble:     Prism[Json, Double]
-  def jString:     Prism[Json, String]
-  def jBigDecimal: Prism[Json, BigDecimal]
-  def jBigInt:     Prism[Json, BigInt]
-  def jLong:       Prism[Json, Long]
-  def jInt:        Prism[Json, Int]
-  def jShort:      Prism[Json, Short]
-  def jByte:       Prism[Json, Byte]
+  def jNull:       Prism[J, Unit]
+  def jObject:     Prism[J, JsonObject]
+  def jArray:      Prism[J, List[J]]
+  def jBoolean:    Prism[J, Boolean]
+  def jNumber:     Prism[J, JsonNumber]
+  def jDouble:     Prism[J, Double]
+  def jString:     Prism[J, String]
+  def jBigDecimal: Prism[J, BigDecimal]
+  def jBigInt:     Prism[J, BigInt]
+  def jLong:       Prism[J, Long]
+  def jInt:        Prism[J, Int]
+  def jShort:      Prism[J, Short]
+  def jByte:       Prism[J, Byte]
 
-  def jDescendants:       Traversal[Json, Json]
-  def jObjectEach:        Each[JsonObject, Json]
-  def jObjectFilterIndex: FilterIndex[JsonObject, String, Json]
+  def jDescendants:       Traversal[J, J]
+  def jObjectEach:        Each[JsonObject, J]
+  def jObjectFilterIndex: FilterIndex[JsonObject, String, J]
 }
 
 object SPI {
-  def apply[JSON](implicit spi: SPI[JSON]): Aux[JSON, spi.JsonObject] = spi
+  def apply[J](implicit spi: SPI[J]): Aux[J, spi.JsonObject] = spi
 
-  type Aux[Json, JsonObject0] = SPI[Json] { type JsonObject = JsonObject0 }
+  type Aux[J, JsonObject0] = SPI[J] { type JsonObject = JsonObject0 }
 }

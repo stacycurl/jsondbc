@@ -11,16 +11,9 @@ import scalaz.\/
 import scala.language.{dynamics, higherKinds, implicitConversions}
 
 
-object argonaut extends ArgonautSPI {
-  implicit class AnyFrills[A](val self: A) extends AnyVal {
-    def descendant(implicit spi: SPI[A]): Descendant[A, A, A] =
-      Descendant(self, List(Traversal.id[A]), () => List("" -> Traversal.id[A]))
 
-    def descendant(paths: String*)(implicit spi: SPI[A]): Descendant[A, A, A] = Descendant(self,
-      paths.map(jsondbc.JsonPath.traversal[A])(collection.breakOut),
-      () => paths.flatMap(jsondbc.JsonPath.ancestors[A])(collection.breakOut)
-    )
-  }
+
+object argonaut extends ArgonautSPI {
 
   implicit class DescendantFrills[From, Via, To](val self: Descendant[From, Via, To]) extends AnyVal {
     def array[That]( implicit cpf: CanPrismFrom[To, List[Json], That]): Descendant[From, Via, That] = self.composePrism(cpf.prism)
