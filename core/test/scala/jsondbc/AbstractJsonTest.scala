@@ -6,20 +6,41 @@ import org.scalatest.FreeSpecLike
 abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   import spi._
 
+  val (j123, j456) = (jLong(123), jLong(456))
+  val ab = obj("a" -> j123, "b" -> j456)
+
   "filterKeys" in {
-    obj("a" -> jLong(123), "b" -> jLong(456)).filterKeys(_ == "a") <=> obj("a" -> jLong(123))
+    ab.filterKeys(_ == "a") <=> obj("a" -> j123)
   }
 
   "filterKeysNot" in {
-    obj("a" -> jLong(123), "b" -> jLong(456)).filterKeysNot(_ == "a") <=> obj("b" -> jLong(456))
+    ab.filterKeysNot(_ == "a") <=> obj("b" -> j456)
   }
 
   "filterValues" in {
-    obj("a" -> jLong(123), "b" -> jLong(456)).filterValues(_ == jLong(123)) <=> obj("a" -> jLong(123))
+    ab.filterValues(_ == j123) <=> obj("a" -> j123)
   }
 
   "filterValuesNot" in {
-    obj("a" -> jLong(123), "b" -> jLong(456)).filterValuesNot(_ == jLong(123)) <=> obj("b" -> jLong(456))
+    ab.filterValuesNot(_ == j123) <=> obj("b" -> j456)
+  }
+
+  "descendant" - {
+    "filterKeys" in {
+      obj("owner" -> ab).descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" -> obj("a" -> j123))
+    }
+
+    "filterKeysNot" in {
+      obj("owner" -> ab).descendant("$.owner").filterKeysNot(_ == "a") <=> obj("owner" -> obj("b" -> j456))
+    }
+
+    "filterValues" in {
+      obj("owner" -> ab).descendant("$.owner").filterValues(_ == j123) <=> obj("owner" -> obj("a" -> j123))
+    }
+
+    "filterValuesNot" in {
+      obj("owner" -> ab).descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" -> obj("b" -> j456))
+    }
   }
 
   "booleanFilter" in {

@@ -193,11 +193,6 @@ object argonaut extends ArgonautSPI {
 
     def removeFields(names: String*): From = self.modify(_.removeFields(names: _*))
 
-    def filterKeys(predicate: String => Boolean): From = self.modify(_.filterKeys(predicate))
-    def filterKeysNot(predicate: String => Boolean): From = self.modify(_.filterKeysNot(predicate))
-    def filterValues(predicate: Json => Boolean): From = self.modify(_.filterValues(predicate))
-    def filterValuesNot(predicate: Json => Boolean): From = self.modify(_.filterValuesNot(predicate))
-
     def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
 
     def each: Descendant[From, Json, Json] = self composeTraversal JsonMonocle.jDescendants

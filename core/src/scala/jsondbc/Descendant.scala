@@ -9,6 +9,11 @@ import monocle.{Iso, Optional, Prism, Traversal}
 case class Descendant[From, Via, To](
   from: From, traversals: List[Traversal[From, To]], ancestorsFn: () => List[(String, Traversal[From, Via])]
 ) extends Dynamic {
+  def filterKeys(p: String => Boolean)   (implicit spi: SPI[To]): From = modify(spi.filterKeys(_)(p))
+  def filterKeysNot(p: String => Boolean)(implicit spi: SPI[To]): From = modify(spi.filterKeysNot(_)(p))
+  def filterValues(p: To => Boolean)     (implicit spi: SPI[To]): From = modify(spi.filterValues(_)(p))
+  def filterValuesNot(p: To => Boolean)  (implicit spi: SPI[To]): From = modify(spi.filterValuesNot(_)(p))
+
   def bool[That](  implicit cpf: CanPrismFrom[To, Boolean,    That]): Descendant[From, Via, That] = apply(cpf)
   def string[That](implicit cpf: CanPrismFrom[To, String,     That]): Descendant[From, Via, That] = apply(cpf)
 
