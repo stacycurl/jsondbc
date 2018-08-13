@@ -9,13 +9,18 @@ trait SPI[J] {
   type JsonNumber
 
   // Helpers
-  final def filterKeys(j: J)(p: String => Boolean): J = mapMap(_.filter { case (key, _) => p(key) })(j)
-  final def filterKeysNot(j: J)(p: String => Boolean): J = mapMap(_.filterNot { case (key, _) => p(key) })(j)
-  final def filterValues(j: J)(p: J => Boolean): J = mapMap(_.filter { case (_, v) => p(v) })(j)
-  final def filterValuesNot(j: J)(p: J => Boolean): J = mapMap(_.filterNot { case (_, v) => p(v) })(j)
+  final def filterKeys(j: J, p: String => Boolean): J = mapMap(j, _.filter { case (key, _) => p(key) })
+  final def filterKeysNot(j: J, p: String => Boolean): J = mapMap(j, _.filterNot { case (key, _) => p(key) })
+  final def filterValues(j: J, p: J => Boolean): J = mapMap(j, _.filter { case (_, v) => p(v) })
+  final def filterValuesNot(j: J, p: J => Boolean): J = mapMap(j, _.filterNot { case (_, v) => p(v) })
 
+  final def renameFields(j: J, fromTos: (String, String)*): J = mapMap(j, map => {
+    fromTos.foldLeft(map) {
+      case (acc, (from, to)) => acc.get(from).fold(acc)(value => (acc - from) + ((to, value)))
+    }
+  })
 
-  private def mapMap(f: Map[String, J] => Map[String, J])(j: J): J =
+  private def mapMap(j: J, f: Map[String, J] => Map[String, J]): J =
     (jObject composeIso jObjectMap).modify(f).apply(j)
 
   def jField(json: J, name: String): Option[J]

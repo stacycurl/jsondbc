@@ -14,9 +14,12 @@ object generic {
       () => paths.flatMap(jsondbc.JsonPath.ancestors[A])(collection.breakOut)
     )
 
-    def filterKeys(p: String => Boolean)   (implicit spi: SPI[A]): A = spi.filterKeys(self)(p)
-    def filterKeysNot(p: String => Boolean)(implicit spi: SPI[A]): A = spi.filterKeysNot(self)(p)
-    def filterValues(p: A => Boolean)      (implicit spi: SPI[A]): A = spi.filterValues(self)(p)
-    def filterValuesNot(p: A => Boolean)   (implicit spi: SPI[A]): A = spi.filterValuesNot(self)(p)
+    def filterKeys(p: String => Boolean)   (implicit spi: SPI[A]): A = spi.filterKeys(self, p)
+    def filterKeysNot(p: String => Boolean)(implicit spi: SPI[A]): A = spi.filterKeysNot(self, p)
+    def filterValues(p: A => Boolean)      (implicit spi: SPI[A]): A = spi.filterValues(self, p)
+    def filterValuesNot(p: A => Boolean)   (implicit spi: SPI[A]): A = spi.filterValuesNot(self, p)
+
+    def renameFields(fromTos: (String, String)*)(implicit spi: SPI[A]): A = spi.renameFields(self, fromTos: _*)
+
   }
 }

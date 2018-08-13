@@ -68,26 +68,6 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
     jobj.descendant("$.address").as[Address].modify(_.reverse) <=> jobj.descendant("$.address").array.modify(_.reverse)
   }
 
-  "descendant_renameFields" in {
-    parse("""{ "thing": { "original": true } }""").descendant("$.thing").renameFields("original" -> "renamed") <=> parse("""{ "thing": { "renamed": true } }""")
-  }
-
-  "descendant_obj_renameFields" in {
-    parse("""{ "thing": { "original": true } }""").descendant("$.thing").obj.renameFields("original" -> "renamed") <=> parse("""{ "thing": { "renamed": true } }""")
-  }
-
-  "renameFields" in {
-    obj("original" → jTrue).renameFields("original" -> "renamed") <=> obj("renamed" → jTrue)
-  }
-
-  "descendant_renameManyFields" in {
-    parse("""{ "thing": { "a": true, "b": false} }""").descendant("$.thing").renameFields("a" → "A", "b" → "B") <=> parse("""{ "thing": { "A": true, "B": false} }""")
-  }
-
-  "descendant_obj_renameManyFields" in {
-    parse("""{ "thing": { "a": true, "b": false} }""").descendant("$.thing").obj.renameFields("a" → "A", "b" → "B") <=> parse("""{ "thing": { "A": true, "B": false} }""")
-  }
-
   "renameManyFields" in {
     obj("a" → jTrue, "b" → jFalse).renameFields("a" → "A", "b" → "B") <=> obj("A" → jTrue, "B" → jFalse)
   }

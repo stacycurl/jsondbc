@@ -25,6 +25,12 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     ab.filterValuesNot(_ == j123) <=> obj("b" -> j456)
   }
 
+
+  "renameFields" in {
+    obj("original" → jTrue).renameFields("original" -> "renamed") <=> obj("renamed" → jTrue)
+  }
+
+
   "descendant" - {
     "filterKeys" in {
       obj("owner" -> ab).descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" -> obj("a" -> j123))
@@ -40,6 +46,14 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
     "filterValuesNot" in {
       obj("owner" -> ab).descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" -> obj("b" -> j456))
+    }
+
+    "descendant_renameFields" in {
+      obj("owner" -> ab).descendant("$.owner").renameFields("b" -> "c") <=> obj("owner" -> obj("a" -> j123, "c" -> j456))
+    }
+
+    "descendant_renameManyFields" in {
+      obj("owner" -> ab).descendant("$.owner").renameFields("a" -> "x", "b" -> "y") <=> obj("owner" -> obj("x" -> j123, "y" -> j456))
     }
   }
 
