@@ -1,8 +1,8 @@
 package jsondbc
 
 import io.circe.Json
-
-import CirceSPI._
+import io.circe.jawn.JawnParser
+import jsondbc.CirceSPI._
 
 
 class CirceJsonTest  extends AbstractJsonTest[Json] {
@@ -12,9 +12,14 @@ class CirceJsonTest  extends AbstractJsonTest[Json] {
     assert(actual === expected)
   }
 
-  def parse(jsonText: String): Json = Json.fromString(jsonText)
+  def parse(jsonText: String): Json = parser.parse(jsonText) match {
+    case Left(failure) => sys.error(failure.message)
+    case Right(json)   => json
+  }
 
   def obj(socks: (String, Json)*): Json = Json.obj(socks: _*)
 
   def print(values: List[Json]): Unit = println(values)
+
+  private def parser = new JawnParser
 }

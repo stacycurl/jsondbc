@@ -66,9 +66,7 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
     "values" in {
       jobj.descendant("$.age").getAll <=> List(age)
-      jobj.descendant("$.age").modify(_ ⇒ {
-        redacted
-      }) <=> ("age" → redacted) ->: jobj
+      jobj.descendant("$.age").modify(_ ⇒ redacted) <=> ("age" → redacted) ->: jobj
 
       jobj.descendant("$.name", "$.age").getAll <=> List(name, age)
       jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj

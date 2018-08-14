@@ -57,7 +57,8 @@ object JsonDBCBuild extends Build {
     settings(
       libraryDependencies <++= scalaVersion(dependencies("2.12.3" → List(
         "io.circe" %% "circe-core"        % "0.9.3",
-        "io.circe"  % "circe-optics_2.12" % "0.9.3"
+        "io.circe"  % "circe-optics_2.12" % "0.9.3",
+        "io.circe" %% "circe-parser" % "0.9.3" % "test"
       )))
     )
   ).dependsOn(core)
