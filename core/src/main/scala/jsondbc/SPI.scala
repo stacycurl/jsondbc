@@ -13,6 +13,18 @@ trait SPI[J] {
   final def filterValues(j: J, p: J => Boolean): J = mapMap(j, _.filter { case (_, v) => p(v) })
   final def filterValuesNot(j: J, p: J => Boolean): J = mapMap(j, _.filterNot { case (_, v) => p(v) })
 
+  def filterRecursive(j: J, p: J => Boolean): J = if (p(j)) {
+    val mapMapped = mapMap(j, _.collect {
+      case (k, v) if p(v) => k -> filterRecursive(v, p)
+    })
+
+    mapList(mapMapped, _.collect {
+      case v if p(v) => filterRecursive(v, p)
+    })
+  } else {
+    jNull.apply(())
+  }
+
   final def renameFields(j: J, fromTos: (String, String)*): J = mapMap(j, map => {
     fromTos.foldLeft(map) {
       case (acc, (from, to)) => acc.get(from).fold(acc)(value => (acc - from) + ((to, value)))
@@ -24,6 +36,9 @@ trait SPI[J] {
       case (acc, kv@(k, _)) => acc.get(k).fold(acc + kv)(_ ⇒ acc)
     }
   })
+
+  private def mapList(j: J, f: List[J] => List[J]): J =
+    jArray.modify(f).apply(j)
 
   private def mapMap(j: J, f: Map[String, J] => Map[String, J]): J =
     (jObject composeIso jObjectMap).modify(f).apply(j)

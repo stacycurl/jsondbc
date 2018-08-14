@@ -24,9 +24,6 @@ object argonaut extends ArgonautSPI {
   }
 
   implicit class JsonFrills(val self: Json) extends AnyVal {
-    def compact:                             Json = filterNulls
-    def filterNulls:                         Json = filterR(_ != jNull)
-
     def mapValuesWithKey(f: String => Json => Json): Json = self.withObject(_.mapValuesWithKey(f))
 
 //    def renameFields(fromTos: (String, String)*): Json = self.withObject(_.renameFields(fromTos: _*))

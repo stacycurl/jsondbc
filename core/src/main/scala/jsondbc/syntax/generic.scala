@@ -14,6 +14,9 @@ object generic {
       () => paths.flatMap(jsondbc.JsonPath.ancestors[A])(collection.breakOut)
     )
 
+    def filterNulls                     (implicit spi: SPI[A]): A = filterRecursive(_ != spi.jNull(()))
+    def filterRecursive(p: A => Boolean)(implicit spi: SPI[A]): A = spi.filterRecursive(self, p)
+
     def filterKeys(p: String => Boolean)   (implicit spi: SPI[A]): A = spi.filterKeys(self, p)
     def filterKeysNot(p: String => Boolean)(implicit spi: SPI[A]): A = spi.filterKeysNot(self, p)
     def filterValues(p: A => Boolean)      (implicit spi: SPI[A]): A = spi.filterValues(self, p)
