@@ -20,13 +20,15 @@ trait SpraySPI {
     }
 
     val ordering: Ordering[JsValue] = {
-      Ordering.Tuple4[Option[Boolean], Option[Int], Option[Double], Option[String]].on[JsValue](json ⇒ {
-        (asBoolean(json), asInt(json), asDouble(json), asString(json))
+      implicit val recurse: Ordering[JsValue] = (x: JsValue, y: JsValue) => ordering.compare(x, y)
+
+      Ordering.Tuple5[Option[Boolean], Option[Int], Option[Double], Option[String], Option[Iterable[(String, JsValue)]]].on[JsValue](json ⇒ {
+        (asBoolean(json), asInt(json), asDouble(json), asString(json), asJsObject(json).map(_.fields.toList))
       })
     }
 
     val jNull: Prism[JsValue, Unit] = prism[Unit](jsonNull = Some(()))(_ => JsNull)
-    val jObject: Prism[JsValue, JsObject] = prism[JsObject](jsonObject = Some(_))(identity)
+    val jObject: Prism[JsValue, JsObject] = Prism[JsValue, JsObject](asJsObject)(identity)
     val jArray: Prism[JsValue, List[JsValue]] = prism[List[JsValue]](jsonArray = arr => Some(arr.elements.toList))(JsArray(_: _*))
     val jBoolean: Prism[JsValue, Boolean] = Prism[JsValue, Boolean](asBoolean)(JsBoolean(_))
     val jNumber: Prism[JsValue, JsNumber] = prism[JsNumber](jsonNumber = Some(_))(identity)
@@ -62,21 +64,24 @@ trait SpraySPI {
 
     override def filterObject(p: String => Boolean): Traversal[JsObject, JsValue] = {
       new PTraversal[JsObject, JsObject, JsValue, JsValue] {
-        def modifyF[F[_]](f: JsValue => F[JsValue])(o: JsObject)(implicit F: Applicative[F]): F[JsObject] = {
-          F.map(o.fields.toList.foldLeft(F.point(List[(String, JsValue)]())) {
-            case (acc, (k, v)) if p(k) => F.apply2(acc, f(v)) {
-              case (elems, newV) => (k, newV) :: elems
+        import scalaz.std.list._
+        import scalaz.syntax.applicative._
+        import scalaz.syntax.traverse._
+
+        def modifyF[F[_]: Applicative](f: JsValue => F[JsValue])(from: JsObject): F[JsObject] =
+          Applicative[F].map(
+            from.fields.toList.traverse[F, (String, JsValue)]{ case (field, json) =>
+              Applicative[F].map(if (p(field)) f(json) else json.point[F])(field -> _)
             }
-            case (acc, _) => acc
-          })(elems => JsObject(elems.reverse: _*))
-        }
+          )(elems => JsObject(elems.reverse: _*))
       }
     }
 
-    private def asBoolean: JsValue => Option[Boolean] = opt(jsonBool = Some(_))
-    private def asString: JsValue => Option[String] = opt(jsonString = Some(_))
-    private def asInt: JsValue => Option[Int] = opt(jsonNumber = num => Some(num.value.toInt))
-    private def asDouble: JsValue => Option[Double] = opt(jsonNumber = num => Some(num.value.toDouble))
+    private def asBoolean:  JsValue => Option[Boolean]  = opt(jsonBool = Some(_))
+    private def asString:   JsValue => Option[String]   = opt(jsonString = Some(_))
+    private def asInt:      JsValue => Option[Int]      = opt(jsonNumber = num => Some(num.value.toInt))
+    private def asDouble:   JsValue => Option[Double]   = opt(jsonNumber = num => Some(num.value.toDouble))
+    private def asJsObject: JsValue => Option[JsObject] = opt(jsonObject = Some(_))
 
     private def opt[A](
       jsonNull: => Option[A] = None,

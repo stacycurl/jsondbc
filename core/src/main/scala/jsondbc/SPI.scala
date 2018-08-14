@@ -47,7 +47,7 @@ trait SPI[J] {
 
   def jField(json: J, name: String): Option[J]
 
-  val ordering: Ordering[J]
+  def ordering: Ordering[J]
 
   def jNull:       Prism[J, Unit]
   def jObject:     Prism[J, JsonObject]

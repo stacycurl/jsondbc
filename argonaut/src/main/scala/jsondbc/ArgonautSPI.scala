@@ -2,8 +2,7 @@ package jsondbc
 
 import argonaut.{CodecJson, Json, JsonMonocle, JsonObject, JsonObjectMonocle}
 import jsondbc.SPI.Aux
-import monocle.function.{Each, FilterIndex}
-import monocle.{Iso, Lens, Prism, Traversal}
+import monocle.{Iso, Prism, Traversal}
 
 object ArgonautSPI extends ArgonautSPI
 trait ArgonautSPI {

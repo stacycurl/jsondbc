@@ -64,6 +64,36 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   "descendant" - {
     val oab = obj("owner" -> ab)
 
+    "values" in {
+      jobj.descendant("$.age").getAll <=> List(age)
+      jobj.descendant("$.age").modify(_ ⇒ {
+        redacted
+      }) <=> ("age" → redacted) ->: jobj
+
+      jobj.descendant("$.name", "$.age").getAll <=> List(name, age)
+      jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj
+
+      jobj.descendant("$.age").int.getAll <=> List(3)
+      jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jLong(6)) ->: jobj
+    }
+
+    "elements" in {
+      jArray(fields).descendant("$[0, 2]").getAll <=> List(lying, address)
+
+      jArray(fields).descendant("$[0, 2]").modify(_ ⇒ redacted) <=> jArray(List(
+        redacted, name, redacted, age, width, preferences, potatoes, knownUnknowns, awkward
+      ))
+    }
+
+    "all" in {
+      jobj.descendant("$.*").getAll.sorted <=> List(name, age, lying, address, preferences, width, potatoes, knownUnknowns, awkward).sorted
+
+      jobj.descendant("$.*").modify(_ ⇒ jString("redacted")) <=> obj(
+        "name" → redacted, "age" → redacted, "lying" → redacted, "address" → redacted, "preferences" → redacted,
+        "width" → redacted, "potatoes" → redacted, "knownUnknowns" → redacted, "awkward" → redacted
+      )
+    }
+
     "filterKeys" in {
       oab.descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" -> obj("a" -> j123))
     }
@@ -145,33 +175,6 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     )
   }
 
-  "descendant_values" in {
-    jobj.descendant("$.age").getAll <=> List(age)
-    jobj.descendant("$.age").modify(_ ⇒ redacted) <=> ("age" → redacted) ->: jobj
-
-    jobj.descendant("$.name", "$.age").getAll <=> List(name, age)
-    jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj
-
-    jobj.descendant("$.age").int.getAll <=> List(3)
-    jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jLong(6)) ->: jobj
-  }
-
-  "descendant_elements" in {
-    jArray(fields).descendant("$[0, 2]").getAll <=> List(lying, address)
-
-    jArray(fields).descendant("$[0, 2]").modify(_ ⇒ redacted) <=> jArray(List(
-      redacted, name, redacted, age, width, preferences, potatoes, knownUnknowns, awkward
-    ))
-  }
-
-  "descendant_all" in {
-    jobj.descendant("$.*").getAll <=> List(name, age, lying, address, preferences, width, potatoes, knownUnknowns, awkward)
-
-    jobj.descendant("$.*").modify(_ ⇒ jString("redacted")) <=> obj(
-      "name" → redacted, "age" → redacted, "lying" → redacted, "address" → redacted, "preferences" → redacted,
-      "width" → redacted, "potatoes" → redacted, "knownUnknowns" → redacted, "awkward" → redacted
-    )
-  }
 
 
 
@@ -277,6 +280,8 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
 abstract class JsonUtil[J: SPI] extends FreeSpecLike {
   val spi: SPI[J] = SPI[J]
+
+  implicit val jOrdering: Ordering[J] = spi.ordering
 
   import spi._
 
