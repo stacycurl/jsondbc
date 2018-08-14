@@ -39,7 +39,7 @@ trait ArgonautSPI {
     val jObjectMap: Iso[JsonObject, Map[String, Json]] =
       Iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromTraversableOnce)
 
-    val jDescendants:       Traversal[Json, Json]   = JsonMonocle.jDescendants
+    val jDescendants:       Traversal[Json, Json]                 = JsonMonocle.jDescendants
     val jObjectEach:        Each[JsonObject, Json]                = JsonObjectMonocle.jObjectEach
     val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectMonocle.jObjectFilterIndex
   }
