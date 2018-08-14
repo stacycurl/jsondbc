@@ -47,23 +47,21 @@ trait SpraySPI {
       override def modifyF[F[_]](f: JsValue => F[JsValue])(s: JsValue)(implicit F: scalaz.Applicative[F]): F[JsValue] =
         jsFold(F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s),
           arr => F.map(Each.each[List[JsValue], JsValue].modifyF(f)(arr.elements.toList))(JsArray(_: _*): JsValue),
-          obj => F.map(jObjectEach.each.modifyF(f)(obj))(jsObject => jsObject: JsValue)
+          obj => F.map(jObjectValues.modifyF(f)(obj))(jsObject => jsObject: JsValue)
         )(s)
     }
 
-    val jObjectEach: Each[JsObject, JsValue] = new Each[JsObject, JsValue] {
-      def each: Traversal[JsObject, JsValue] = new PTraversal[JsObject, JsObject, JsValue, JsValue] {
-        def modifyF[F[_]](f: JsValue => F[JsValue])(o: JsObject)(implicit F: Applicative[F]): F[JsObject] = {
-          F.map(o.fields.toList.foldLeft(F.point(List[(String, JsValue)]())) {
-            case (acc, (k, v)) => F.apply2(acc, f(v)) {
-              case (elems, newV) => (k, newV) :: elems
-            }
-          })(elems => JsObject(elems.reverse: _*))
-        }
+    val jObjectValues: Traversal[JsObject, JsValue] = new PTraversal[JsObject, JsObject, JsValue, JsValue] {
+      def modifyF[F[_]](f: JsValue => F[JsValue])(o: JsObject)(implicit F: Applicative[F]): F[JsObject] = {
+        F.map(o.fields.toList.foldLeft(F.point(List[(String, JsValue)]())) {
+          case (acc, (k, v)) => F.apply2(acc, f(v)) {
+            case (elems, newV) => (k, newV) :: elems
+          }
+        })(elems => JsObject(elems.reverse: _*))
       }
     }
 
-    val jObjectFilterIndex: FilterIndex[JsObject, String, JsValue] = (p: String => Boolean) => {
+    override def filterObject(p: String => Boolean): Traversal[JsObject, JsValue] = {
       new PTraversal[JsObject, JsObject, JsValue, JsValue] {
         def modifyF[F[_]](f: JsValue => F[JsValue])(o: JsObject)(implicit F: Applicative[F]): F[JsObject] = {
           F.map(o.fields.toList.foldLeft(F.point(List[(String, JsValue)]())) {

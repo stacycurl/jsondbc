@@ -1,6 +1,5 @@
 package jsondbc
 
-import monocle.function.{Each, FilterIndex}
 import monocle.{Iso, Prism, Traversal}
 
 
@@ -48,9 +47,10 @@ trait SPI[J] {
   def jByte:       Prism[J, Byte]
   def jObjectMap:  Iso[JsonObject, Map[String, J]]
 
-  def jDescendants:       Traversal[J, J]
-  def jObjectEach:        Each[JsonObject, J]
-  def jObjectFilterIndex: FilterIndex[JsonObject, String, J]
+  def jDescendants:  Traversal[J, J]
+  def jObjectValues: Traversal[JsonObject, J]
+
+  def filterObject(p: String => Boolean): Traversal[JsonObject, J]
 }
 
 object SPI {

@@ -41,8 +41,9 @@ trait CirceSPI {
     val jObjectMap:  Iso[JsonObject, Map[String, Json]] =
       Iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromMap)
 
-    val jDescendants:       Traversal[Json, Json]   = JsonOptics.jsonDescendants
-    val jObjectEach:        Each[JsonObject, Json]                = JsonObjectOptics.jsonObjectEach
-    val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectOptics.jsonObjectFilterIndex
+    val jDescendants:  Traversal[Json, Json]       = JsonOptics.jsonDescendants
+    val jObjectValues: Traversal[JsonObject, Json] = JsonObjectOptics.jsonObjectEach.each
+
+    def filterObject(p: String => Boolean): Traversal[JsonObject, Json] = JsonObjectOptics.jsonObjectFilterIndex.filterIndex(p)
   }
 }

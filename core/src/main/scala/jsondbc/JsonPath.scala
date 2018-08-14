@@ -42,9 +42,9 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
   private def step(acc: Traversal[A, Json], token: PathToken): Traversal[A, Json] = token match {
     case RecursiveField(name)           ⇒ notSupported(s"RecursiveField($name)")
     case RootNode                       ⇒ acc
-    case AnyField                       ⇒ acc composePrism spi.jObject composeTraversal spi.jObjectEach.each
-    case MultiField(names)              ⇒ acc composePrism spi.jObject composeTraversal FilterIndex.filterIndex(names.toSet: Set[String])(spi.jObjectFilterIndex)
-    case Field(name)                    ⇒ acc composePrism spi.jObject composeTraversal FilterIndex.filterIndex(Set(name))(spi.jObjectFilterIndex)
+    case AnyField                       ⇒ acc composePrism spi.jObject composeTraversal spi.jObjectValues
+    case MultiField(names)              ⇒ acc composePrism spi.jObject composeTraversal spi.filterObject(names.toSet: Set[String])
+    case Field(name)                    ⇒ acc composePrism spi.jObject composeTraversal spi.filterObject(Set(name))
     case RecursiveAnyField              ⇒ notSupported("RecursiveAnyField")
     case CurrentNode                    ⇒ acc
     case FILTER_TOKEN(predicate)        ⇒ filterArrayOrObject(predicate)(acc)

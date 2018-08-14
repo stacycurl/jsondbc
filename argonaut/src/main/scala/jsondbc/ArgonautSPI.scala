@@ -39,9 +39,10 @@ trait ArgonautSPI {
     val jObjectMap: Iso[JsonObject, Map[String, Json]] =
       Iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromTraversableOnce)
 
-    val jDescendants:       Traversal[Json, Json]                 = JsonMonocle.jDescendants
-    val jObjectEach:        Each[JsonObject, Json]                = JsonObjectMonocle.jObjectEach
-    val jObjectFilterIndex: FilterIndex[JsonObject, String, Json] = JsonObjectMonocle.jObjectFilterIndex
+    val jDescendants:  Traversal[Json, Json]       = JsonMonocle.jDescendants
+    val jObjectValues: Traversal[JsonObject, Json] = JsonObjectMonocle.jObjectEach.each
+
+    def filterObject(p: String => Boolean): Traversal[JsonObject, Json] = JsonObjectMonocle.jObjectFilterIndex.filterIndex(p)
   }
 
   implicit val cpfJsonToJsonObject: CanPrismFrom[Json, JsonObject, JsonObject] = CanPrismFrom(argonautSPI.jObject)
