@@ -22,6 +22,7 @@ object generic {
     def filterValues(p: A => Boolean)      (implicit spi: SPI[A]): A = spi.filterValues(self, p)
     def filterValuesNot(p: A => Boolean)   (implicit spi: SPI[A]): A = spi.filterValuesNot(self, p)
 
+    def removeFields(names: String*)(implicit spi: SPI[A]): A = spi.removeFields(self, names: _*)
     def renameFields(fromTos: (String, String)*)(implicit spi: SPI[A]): A = spi.renameFields(self, fromTos: _*)
 
     def addIfMissing(assocs: (String, A)*)(implicit spi: SPI[A]): A= spi.addIfMissing(self, assocs: _*)

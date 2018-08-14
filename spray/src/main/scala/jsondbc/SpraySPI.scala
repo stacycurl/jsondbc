@@ -1,8 +1,7 @@
-package jsondbc.syntax
+package jsondbc
 
-import jsondbc.SPI
+import monocle.function.Each
 import monocle.{Iso, PTraversal, Prism, Traversal}
-import monocle.function.{Each, FilterIndex}
 import scalaz.Applicative
 import spray.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, JsValue}
 

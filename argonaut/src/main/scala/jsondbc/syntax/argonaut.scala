@@ -26,12 +26,6 @@ object argonaut extends ArgonautSPI {
   implicit class JsonFrills(val self: Json) extends AnyVal {
     def mapValuesWithKey(f: String => Json => Json): Json = self.withObject(_.mapValuesWithKey(f))
 
-//    def renameFields(fromTos: (String, String)*): Json = self.withObject(_.renameFields(fromTos: _*))
-//
-//    def addIfMissing(assocs: Json.JsonAssoc*):   Json = self.withObject(_.addIfMissing(assocs: _*))
-
-    def removeFields(names: String*): Json = self.withObject(_.removeFields(names: _*))
-
 //    def delete(path: String): Json = {
 //      path.split("/").toList.reverse match {
 //        case head :: Nil ⇒ descendant("").obj.delete(head)
@@ -184,8 +178,6 @@ object argonaut extends ArgonautSPI {
   }
 
   implicit class DescendantToJsonFrills[From](self: Descendant[From, Json, Json]) {
-    def removeFields(names: String*): From = self.modify(_.removeFields(names: _*))
-
     def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
 
     def each: Descendant[From, Json, Json] = self composeTraversal JsonMonocle.jDescendants

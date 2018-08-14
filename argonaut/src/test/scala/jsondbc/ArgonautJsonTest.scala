@@ -15,26 +15,6 @@ import jsondbc.syntax.generic._
 class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
   import spi._
 
-  "filterNulls" in {
-    test(_.filterNulls,
-      """null"""                        → """null""",
-      """{ "a": null, "b": 3 }"""       → """{ "b": 3 }""",
-      """[ "a", null, "b" ]"""          → """[ "a", "b" ]""",
-      """{ "o": [ "a", null, "b" ] }""" → """{ "o": [ "a", "b" ] }""",
-      """[ { "a": null, "b": 3 } ]"""   → """[ { "b": 3 } ]"""
-    )
-  }
-
-  "filterR" in {
-    test(_.filterR(_ != Json.jEmptyObject),
-      """{}"""                        → """null""",
-      """{ "a": {}, "b": 3 }"""       → """{ "b": 3 }""",
-      """[ "a", {}, "b" ]"""          → """[ "a", "b" ]""",
-      """{ "o": [ "a", {}, "b" ] }""" → """{ "o": [ "a", "b" ] }""",
-      """[ { "a": {}, "b": 3 } ]"""   → """[ { "b": 3 } ]"""
-    )
-  }
-
   "descendant_ancestors" in {
     jobj.descendant("$.preferences.bananas").string.ancestors <=> obj(
       "$"                     -> Json.jArray(jobj.descendant("$").getAll),
@@ -54,15 +34,6 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
     jobj.descendant("$.address").as[Address].getAll            <=> List(Address(List("29 Acacia Road", "Nuttytown")))
     jobj.descendant("$.address").as[Address].modify(_.reverse) <=> jobj.descendant("$.address").array.modify(_.reverse)
   }
-
-  "removeFields" in {
-    on(
-      obj("a" := "value", "b" := 123, "c" := true), obj("a" := "value", "b" := 123)
-    ).calling(_.removeFields("b", "c")).produces(
-      obj("a" := "value"), obj("a" := "value")
-    )
-  }
-
 
   "delete" in {//    println(parse(
 //      """{

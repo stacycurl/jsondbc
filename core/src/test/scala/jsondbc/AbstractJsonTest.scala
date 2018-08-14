@@ -25,8 +25,35 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     ab.filterValuesNot(_ == j123) <=> obj("b" -> j456)
   }
 
+
+  "filterNulls" in {
+    test(_.filterNulls,
+      """null"""                        → """null""",
+      """{ "a": null, "b": 3 }"""       → """{ "b": 3 }""",
+      """[ "a", null, "b" ]"""          → """[ "a", "b" ]""",
+      """{ "o": [ "a", null, "b" ] }""" → """{ "o": [ "a", "b" ] }""",
+      """[ { "a": null, "b": 3 } ]"""   → """[ { "b": 3 } ]"""
+    )
+  }
+
+  "filterRecursive" in {
+    val emptyObject = obj()
+
+    test(_.filterRecursive(_ != emptyObject),
+      """{}"""                        → """null""",
+      """{ "a": {}, "b": 3 }"""       → """{ "b": 3 }""",
+      """[ "a", {}, "b" ]"""          → """[ "a", "b" ]""",
+      """{ "o": [ "a", {}, "b" ] }""" → """{ "o": [ "a", "b" ] }""",
+      """[ { "a": {}, "b": 3 } ]"""   → """[ { "b": 3 } ]"""
+    )
+  }
+
   "renameFields" in {
     obj("original" → jTrue).renameFields("original" -> "renamed") <=> obj("renamed" → jTrue)
+  }
+
+  "removeFields" in {
+    ab.removeFields("a") <=> obj("a" -> j123)
   }
 
   "addIfMissing" in {
@@ -53,11 +80,8 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
       oab.descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" -> obj("b" -> j456))
     }
 
-    "descendant_renameFields" in {
-      oab.descendant("$.owner").renameFields("b" -> "c") <=> obj("owner" -> obj("a" -> j123, "c" -> j456))
-    }
-
-    "descendant_renameManyFields" in {
+    "renameFields" in {
+      oab.descendant("$.owner").renameFields("b" -> "c")             <=> obj("owner" -> obj("a" -> j123, "c" -> j456))
       oab.descendant("$.owner").renameFields("a" -> "x", "b" -> "y") <=> obj("owner" -> obj("x" -> j123, "y" -> j456))
     }
 
@@ -73,6 +97,10 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
         thing(obj("a" -> jAdded, "b" -> jAdded)),    thing(obj("a" -> jExisting, "b" -> jAdded)),
         thing(obj("a" -> jAdded, "b" -> jExisting)), thing(obj("a" -> jExisting, "b" -> jExisting))
       )
+    }
+
+    "removeFields" in {
+      oab.descendant("$.owner").removeFields("a") <=> obj("owner" -> obj("a" -> j123))
     }
   }
 

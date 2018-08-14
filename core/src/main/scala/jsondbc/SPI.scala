@@ -25,6 +25,8 @@ trait SPI[J] {
     jNull.apply(())
   }
 
+  def removeFields(j: J, names: String*): J = mapMap(j, _.filterKeys(names.toSet))
+
   final def renameFields(j: J, fromTos: (String, String)*): J = mapMap(j, map => {
     fromTos.foldLeft(map) {
       case (acc, (from, to)) => acc.get(from).fold(acc)(value => (acc - from) + ((to, value)))

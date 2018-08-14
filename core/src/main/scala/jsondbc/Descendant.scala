@@ -14,8 +14,9 @@ case class Descendant[From, Via, To](
   def filterValues(p: To => Boolean)     (implicit spi: SPI[To]): From = modify(spi.filterValues(_, p))
   def filterValuesNot(p: To => Boolean)  (implicit spi: SPI[To]): From = modify(spi.filterValuesNot(_, p))
 
+  def removeFields(names: String*)(implicit spi: SPI[To]): From = modify(spi.removeFields(_, names: _*))
   def renameFields(fromTos: (String, String)*)(implicit spi: SPI[To]): From = modify(spi.renameFields(_, fromTos: _*))
-  def addIfMissing(assocs: (String, To)*)(implicit spi: SPI[To]):   From = modify(spi.addIfMissing(_, assocs: _*))
+  def addIfMissing(assocs: (String, To)*)(implicit spi: SPI[To]): From = modify(spi.addIfMissing(_, assocs: _*))
 
 
   def bool[That](  implicit cpf: CanPrismFrom[To, Boolean,    That]): Descendant[From, Via, That] = apply(cpf)

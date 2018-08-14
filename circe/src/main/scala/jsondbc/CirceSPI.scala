@@ -2,7 +2,6 @@ package jsondbc
 
 import io.circe.optics.{JsonObjectOptics, JsonOptics}
 import io.circe.{Json, JsonObject}
-import monocle.function.{Each, FilterIndex}
 import monocle.{Iso, Prism, Traversal}
 import jsondbc.SPI.Aux
 
