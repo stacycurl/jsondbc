@@ -20,6 +20,12 @@ trait SPI[J] {
     }
   })
 
+  final def addIfMissing(j: J, assocs: (String, J)*): J = mapMap(j, map => {
+    assocs.foldLeft(map) {
+      case (acc, kv@(k, _)) => acc.get(k).fold(acc + kv)(_ ⇒ acc)
+    }
+  })
+
   private def mapMap(j: J, f: Map[String, J] => Map[String, J]): J =
     (jObject composeIso jObjectMap).modify(f).apply(j)
 

@@ -21,5 +21,6 @@ object generic {
 
     def renameFields(fromTos: (String, String)*)(implicit spi: SPI[A]): A = spi.renameFields(self, fromTos: _*)
 
+    def addIfMissing(assocs: (String, A)*)(implicit spi: SPI[A]): A= spi.addIfMissing(self, assocs: _*)
   }
 }

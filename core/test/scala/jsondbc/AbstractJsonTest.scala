@@ -25,35 +25,54 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     ab.filterValuesNot(_ == j123) <=> obj("b" -> j456)
   }
 
-
   "renameFields" in {
     obj("original" → jTrue).renameFields("original" -> "renamed") <=> obj("renamed" → jTrue)
   }
 
+  "addIfMissing" in {
+    obj()                .addIfMissing("a" -> jAdded) <=> obj("a" -> jAdded)
+    obj("a" -> jExisting).addIfMissing("a" -> jAdded) <=> obj("a" -> jExisting)
+  }
 
   "descendant" - {
+    val oab = obj("owner" -> ab)
+
     "filterKeys" in {
-      obj("owner" -> ab).descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" -> obj("a" -> j123))
+      oab.descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" -> obj("a" -> j123))
     }
 
     "filterKeysNot" in {
-      obj("owner" -> ab).descendant("$.owner").filterKeysNot(_ == "a") <=> obj("owner" -> obj("b" -> j456))
+      oab.descendant("$.owner").filterKeysNot(_ == "a") <=> obj("owner" -> obj("b" -> j456))
     }
 
     "filterValues" in {
-      obj("owner" -> ab).descendant("$.owner").filterValues(_ == j123) <=> obj("owner" -> obj("a" -> j123))
+      oab.descendant("$.owner").filterValues(_ == j123) <=> obj("owner" -> obj("a" -> j123))
     }
 
     "filterValuesNot" in {
-      obj("owner" -> ab).descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" -> obj("b" -> j456))
+      oab.descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" -> obj("b" -> j456))
     }
 
     "descendant_renameFields" in {
-      obj("owner" -> ab).descendant("$.owner").renameFields("b" -> "c") <=> obj("owner" -> obj("a" -> j123, "c" -> j456))
+      oab.descendant("$.owner").renameFields("b" -> "c") <=> obj("owner" -> obj("a" -> j123, "c" -> j456))
     }
 
     "descendant_renameManyFields" in {
-      obj("owner" -> ab).descendant("$.owner").renameFields("a" -> "x", "b" -> "y") <=> obj("owner" -> obj("x" -> j123, "y" -> j456))
+      oab.descendant("$.owner").renameFields("a" -> "x", "b" -> "y") <=> obj("owner" -> obj("x" -> j123, "y" -> j456))
+    }
+
+    "addIfMissing" in {
+      obj("owner" -> obj()).descendant("$.owner").addIfMissing("a" -> jAdded) <=> obj("owner" -> obj("a" -> jAdded))
+      obj()
+      obj("a" -> jExisting).addIfMissing("a" -> jAdded) <=> obj("a" -> jExisting)
+
+      on(
+        thing(obj()),         thing(obj("a" -> jExisting)),
+        thing(obj("b" -> jExisting)), thing(obj("a" -> jExisting, "b" -> jExisting))
+      ).calling(_.descendant("$.thing").addIfMissing("a" -> jAdded, "b" -> jAdded)).produces(
+        thing(obj("a" -> jAdded, "b" -> jAdded)),    thing(obj("a" -> jExisting, "b" -> jAdded)),
+        thing(obj("a" -> jAdded, "b" -> jExisting)), thing(obj("a" -> jExisting, "b" -> jExisting))
+      )
     }
   }
 
@@ -77,7 +96,26 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     json.descendant("$.people[?(@.person.name == 'Raymond' && @.person.age != 21)].address").getAll <=> List(jString("London"))
   }
 
+  "inequalities" in {
+    val List(bob,     jim,   sue)    = List("Bob", "Jim", "Sue").map(jString(_))
+    val List(pancake, round, normal) = List("pancake", "round", "normal").map(jString(_))
 
+    obj(
+      "people" -> jArray(List(
+        obj("name" -> bob, "width" -> j456, "height" -> j123),
+        obj("name" -> jim, "width" -> j123, "height" -> j123),
+        obj("name" -> sue, "width" -> j123, "height" -> j456)
+      ))
+    ).descendant("$.people[?(@.width > @.height)]") .addIfMissing("description" -> pancake)
+     .descendant("$.people[?(@.width == @.height)]").addIfMissing("description" -> round)
+     .descendant("$.people[?(@.width < @.height)]") .addIfMissing("description" -> normal) <=> obj(
+      "people" -> jArray(List(
+        obj("name" -> bob, "width" -> j456, "height" -> j123, "description" -> pancake),
+        obj("name" -> jim, "width" -> j123, "height" -> j123, "description" -> round),
+        obj("name" -> sue, "width" -> j123, "height" -> j456, "description" -> normal)
+      ))
+    )
+  }
 
   "descendant_values" in {
     jobj.descendant("$.age").getAll <=> List(age)

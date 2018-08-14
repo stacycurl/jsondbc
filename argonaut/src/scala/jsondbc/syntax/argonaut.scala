@@ -31,7 +31,7 @@ object argonaut extends ArgonautSPI {
 
 //    def renameFields(fromTos: (String, String)*): Json = self.withObject(_.renameFields(fromTos: _*))
 //
-    def addIfMissing(assocs: Json.JsonAssoc*):   Json = self.withObject(_.addIfMissing(assocs: _*))
+//    def addIfMissing(assocs: Json.JsonAssoc*):   Json = self.withObject(_.addIfMissing(assocs: _*))
 
     def removeFields(names: String*): Json = self.withObject(_.removeFields(names: _*))
 
@@ -187,8 +187,6 @@ object argonaut extends ArgonautSPI {
   }
 
   implicit class DescendantToJsonFrills[From](self: Descendant[From, Json, Json]) {
-    def addIfMissing(assocs: Json.JsonAssoc*):   From = self.modify(_.addIfMissing(assocs: _*))
-
     def removeFields(names: String*): From = self.modify(_.removeFields(names: _*))
 
     def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))

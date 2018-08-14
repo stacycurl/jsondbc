@@ -49,81 +49,10 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
     jobj.descendant("$.pref.apples")        .firstEmptyAt <=> Some("$.pref")
   }
 
-  "foo" in {
-    obj("people" := List(
-      obj("name" := "Bob", "width" := 200, "height" := 100),
-      obj("name" := "Jim", "width" := 100, "height" := 100),
-      obj("name" := "Sue", "width" := 100, "height" := 200)
-    )).descendant("$.people[?(@.width > @.height)]").modify(_.addIfMissing("description" := "pancake"))
-      .descendant("$.people[?(@.width == @.height)]").modify(_.addIfMissing("description" := "round"))
-      .descendant("$.people[?(@.width < @.height)]").modify(_.addIfMissing("description" := "normal")) <=> Json("people" := List(
-      obj("name" := "Bob", "width" := 200, "height" := 100, "description" := "pancake"),
-      obj("name" := "Jim", "width" := 100, "height" := 100, "description" := "round"),
-      obj("name" := "Sue", "width" := 100, "height" := 200, "description" := "normal")
-    ))
-  }
 
   "as" in {
     jobj.descendant("$.address").as[Address].getAll            <=> List(Address(List("29 Acacia Road", "Nuttytown")))
     jobj.descendant("$.address").as[Address].modify(_.reverse) <=> jobj.descendant("$.address").array.modify(_.reverse)
-  }
-
-  "renameManyFields" in {
-    obj("a" → jTrue, "b" → jFalse).renameFields("a" → "A", "b" → "B") <=> obj("A" → jTrue, "B" → jFalse)
-  }
-
-  "descendant_addIfMissing" in {
-    on(
-      parse("""{ "thing": {} }"""),           parse("""{ "thing": {"a": true} }""")
-    ).calling(_.descendant("$.thing").addIfMissing("a" := jFalse)).produces(
-      parse("""{ "thing": {"a": false} }"""), parse("""{ "thing": {"a": true} }""")
-    )
-  }
-
-  "descendant_obj_addIfMissing" in {
-    on(
-      parse("""{ "thing": {} }"""),           parse("""{ "thing": {"a": true} }""")
-    ).calling(_.descendant("$.thing").obj.addIfMissing("a" := jFalse)).produces(
-      parse("""{ "thing": {"a": false} }"""), parse("""{ "thing": {"a": true} }""")
-    )
-  }
-
-  "addIfMissing" in {
-    on(
-      obj(),      obj("a" := existing)
-    ).calling(_.addIfMissing("a" := jString(added))).produces(
-      obj("a" := added), obj("a" := existing)
-    )
-  }
-
-  "descendant_addIfMissing_many" in {
-    on(
-      thing(obj()),         thing(obj("a" := existing)),
-      thing(obj("b" := existing)), thing(obj("a" := existing, "b" := existing))
-    ).calling(_.descendant("$.thing").addIfMissing("a" := added, "b" := added)).produces(
-      thing(obj("a" := added, "b" := added)),    thing(obj("a" := existing, "b" := added)),
-      thing(obj("a" := added, "b" := existing)), thing(obj("a" := existing, "b" := existing))
-    )
-  }
-
-  "descendant_obj_addIfMissing_many" in {
-    on(
-      thing(obj()),         thing(obj("a" := existing)),
-      thing(obj("b" := existing)), thing(obj("a" := existing, "b" := existing))
-    ).calling(_.descendant("$.thing").obj.addIfMissing("a" := added, "b" := added)).produces(
-      thing(obj("a" := added, "b" := added)),    thing(obj("a" := existing, "b" := added)),
-      thing(obj("a" := added, "b" := existing)), thing(obj("a" := existing, "b" := existing))
-    )
-  }
-
-  "addIfMissing_many" in {
-    on(
-      obj(),         obj("a" := existing),
-      obj("b" := existing), obj("a" := existing, "b" := existing)
-    ).calling(_.addIfMissing("a" := added, "b" := added)).produces(
-      obj("a" := added, "b" := added),    obj("a" := existing, "b" := added),
-      obj("a" := added, "b" := existing), obj("a" := existing, "b" := existing)
-    )
   }
 
   "removeFields" in {
