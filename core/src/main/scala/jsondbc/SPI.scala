@@ -7,6 +7,8 @@ trait SPI[J] {
   type JsonObject
   type JsonNumber
 
+  def arrayCPF[That]: CanPrismFrom[J, List[J], List[J]] = ???
+
   // Helpers
   final def filterKeys(j: J, p: String => Boolean): J = mapMap(j, _.filter { case (key, _) => p(key) })
   final def filterKeysNot(j: J, p: String => Boolean): J = mapMap(j, _.filterNot { case (key, _) => p(key) })

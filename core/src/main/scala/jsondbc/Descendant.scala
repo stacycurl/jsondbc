@@ -1,7 +1,8 @@
 package jsondbc
 
-import scala.language.{dynamics, higherKinds, implicitConversions}
+import monocle.function.FilterIndex
 
+import scala.language.{dynamics, higherKinds, implicitConversions}
 import monocle.{Iso, Optional, Prism, Traversal}
 
 
@@ -18,6 +19,12 @@ case class Descendant[From, Via, To](
   def renameFields(fromTos: (String, String)*)(implicit spi: SPI[To]): From = modify(spi.renameFields(_, fromTos: _*))
   def addIfMissing(assocs: (String, To)*)(implicit spi: SPI[To]): From = modify(spi.addIfMissing(_, assocs: _*))
 
+  def selectDynamic(key: String)(implicit spi: SPI[To]): Descendant[From, Via, To] =
+    composePrism(spi.jObject).composeTraversal(spi.filterObject(Set(key)))
+
+  def array(implicit spi: SPI[To]): Descendant[From, Via, List[To]] = composePrism(spi.jArray)
+  def obj(implicit spi: SPI[To]): Descendant[From, Via, spi.JsonObject] = composePrism(spi.jObject)
+  def each(implicit spi: SPI[To]): Descendant[From, Via, To] = composeTraversal(spi.jDescendants)
 
   def bool[That](  implicit cpf: CanPrismFrom[To, Boolean,    That]): Descendant[From, Via, That] = apply(cpf)
   def string[That](implicit cpf: CanPrismFrom[To, String,     That]): Descendant[From, Via, That] = apply(cpf)

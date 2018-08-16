@@ -1,25 +1,17 @@
 package jsondbc.syntax
 
 import _root_.argonaut.Json._
-import _root_.argonaut.JsonObjectMonocle.{jObjectEach, jObjectFilterIndex}
-import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject}
+import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonNumber, JsonObject}
 import jsondbc.syntax.generic._
 import jsondbc.{ArgonautSPI, CanPrismFrom, Descendant}
 import monocle._
-import monocle.function.{Each, FilterIndex}
-import scalaz.\/
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
+import scalaz.\/
 
 object argonaut extends ArgonautSPI {
 
   implicit class DescendantFrills[From, Via, To](val self: Descendant[From, Via, To]) extends AnyVal {
-    def array[That]( implicit cpf: CanPrismFrom[To, List[Json], That]): Descendant[From, Via, That] = self.composePrism(cpf.prism)
-    def obj[That](   implicit cpf: CanPrismFrom[To, JsonObject, That]): Descendant[From, Via, That] = self.composePrism(cpf.prism)
-
-    def selectDynamic(key: String)(implicit cpf: CanPrismFrom[To, JsonObject, JsonObject]): Descendant[From, Via, Json] =
-      obj[JsonObject] composeTraversal FilterIndex.filterIndex(Set(key))
-
     def as[A: CodecJson]: As[From, Via, To, A] = As[From, Via, To, A](self)
   }
 
@@ -175,33 +167,6 @@ object argonaut extends ArgonautSPI {
 
   implicit class JsonArrayFrills(val self: List[Json]) extends AnyVal {
     def filterR(p: Json => Boolean): List[Json] = self.collect { case j if p(j) ⇒ j.filterR(p) }
-  }
-
-  implicit class DescendantToJsonFrills[From](self: Descendant[From, Json, Json]) {
-    def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
-
-    def each: Descendant[From, Json, Json] = self composeTraversal JsonMonocle.jDescendants
-  }
-
-  implicit class DescendantToJsonObjectFrills[From](self: Descendant[From, Json, JsonObject]) {
-    def renameFields(fromTos: (String, String)*): From = self.modify(_.renameFields(fromTos: _*))
-
-    def addIfMissing(assocs: Json.JsonAssoc*):   From = self.modify(_.addIfMissing(assocs: _*))
-
-    def removeFields(names: String*): From = self.modify(_.removeFields(names: _*))
-
-    def filterKeys(predicate: String => Boolean): From = self.modify(_.filterKeys(predicate))
-    def filterKeysNot(predicate: String => Boolean): From = self.modify(_.filterKeysNot(predicate))
-    def filterValues(predicate: Json => Boolean): From = self.modify(_.filterValues(predicate))
-    def filterValuesNot(predicate: Json => Boolean): From = self.modify(_.filterValuesNot(predicate))
-
-    def mapValuesWithKey(f: String => Json => Json): From = self.modify(_.mapValuesWithKey(f))
-
-    def each: Descendant[From, Json, Json] = self composeTraversal Each.each
-
-    //    def delete(key: String): From = {
-//      (descendant.traversal composeLens At.at(key)).set(None).apply(descendant.from)
-//    }
   }
 
   implicit class DescendantViaJsonFrills[From, To](self: Descendant[From, Json, To]) {

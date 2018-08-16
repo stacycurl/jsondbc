@@ -136,6 +136,60 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     "removeFields" in {
       oab.descendant("$.owner").removeFields("a") <=> obj("owner" -> obj("a" -> j123))
     }
+
+    "complex" in {
+      jobj.descendant("$.preferences.*").bool.set(false)
+          .descendant("$.address").array.string.modify("Flat B" :: _)
+          .descendant("$.address[*]").string.modify(_.toUpperCase)
+          .descendant("$.potatoes.*.variety").string.modify(_ ⇒ "Avalanche")
+          .descendant("$.knownUnknowns.*").int.modify(_ ⇒ 42)
+          .descendant("$.awkward.*").string.modify(_.toUpperCase) <=> parse("""
+            |{
+            |  "name" : "Eric",
+            |  "lying" : true,
+            |  "age" : 3,
+            |  "preferences" : {
+            |    "bananas" : false
+            |  },
+            |  "address" : [
+            |    "FLAT B",
+            |    "29 ACACIA ROAD",
+            |    "NUTTYTOWN"
+            |  ],
+            |  "width" : 33.5,
+            |  "knownUnknowns" : {},
+            |  "potatoes" : [],
+            |  "awkward" : { "1": "ONE" }
+            |}""".stripMargin
+          )
+    }
+
+    "dynamic_complex" in {
+      jobj.descendant.preferences.each.bool.set(false)
+          .descendant.address.array.string.modify("Flat B" :: _)
+          .descendant.address.each.string.modify(_.toUpperCase)
+          .descendant.potatoes.each.variety.string.modify(_ ⇒ "Avalanche")
+          .descendant.knownUnknowns.each.int.modify(_ ⇒ 42)
+          .descendant.awkward.each.string.modify(_.toUpperCase) <=> parse("""
+            |{
+            |  "name" : "Eric",
+            |  "lying" : true,
+            |  "age" : 3,
+            |  "preferences" : {
+            |    "bananas" : false
+            |  },
+            |  "address" : [
+            |    "FLAT B",
+            |    "29 ACACIA ROAD",
+            |    "NUTTYTOWN"
+            |  ],
+            |  "width" : 33.5,
+            |  "knownUnknowns" : {},
+            |  "potatoes" : [],
+            |  "awkward" : { "1": "ONE" }
+            |}""".stripMargin
+          )
+    }
   }
 
   "booleanFilter" in {
