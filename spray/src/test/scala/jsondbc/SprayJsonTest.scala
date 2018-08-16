@@ -16,5 +16,5 @@ class SprayJsonTest extends AbstractJsonTest[JsValue] {
 
   def parse(jsonText: String): JsValue = JsonParser.apply(jsonText)
   def obj(socks: (String, JsValue)*): JsValue = JsObject(socks: _*)
-  def print(values: List[JsValue]): Unit = println(values)
+  def print(j: JsValue): Unit = println(j.prettyPrint)
 }

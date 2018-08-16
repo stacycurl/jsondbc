@@ -176,7 +176,7 @@ class JsonObjectTest extends JsonUtil()(ArgonautSPI.argonautSPI) with ArgonautJs
 }
 
 trait ArgonautJsonUtil extends JsonUtil[Json] {
-  def print(values: List[Json]): Unit = values.foreach(j ⇒ println(j.spaces2))
+  def print(j: Json): Unit = println(j.spaces2)
 
   def parse(jsonText: String): Json = Parse.parseOption(jsonText).getOrElse(sys.error("not json"))
 

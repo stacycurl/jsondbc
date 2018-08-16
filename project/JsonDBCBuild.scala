@@ -5,7 +5,7 @@ import sbt._
 
 object JsonDBCBuild extends Build {
   lazy val root = (project in file(".")
-    aggregate(core, argonaut, circe, spray)
+    aggregate(core, argonaut, circe, spray, json4s)
     settings(commonSettings: _*)
     settings(
       publish := (),
@@ -38,7 +38,8 @@ object JsonDBCBuild extends Build {
         "io.argonaut"                %% "argonaut-monocle" % "6.2.2"
       )))
     )
-  ).dependsOn(core)
+    dependsOn core % "compile -> compile; test -> test"
+  )
 
   lazy val spray = (project in file("spray")
     settings(commonSettings: _*)
@@ -49,7 +50,8 @@ object JsonDBCBuild extends Build {
         "org.scalaz" %% "scalaz-core" % "7.3.0-M6"
       )))
     )
-  ).dependsOn(core)
+    dependsOn core % "compile -> compile; test -> test"
+  )
 
   lazy val circe = (project in file("circe")
     settings(commonSettings: _*)
@@ -61,7 +63,20 @@ object JsonDBCBuild extends Build {
         "io.circe" %% "circe-parser" % "0.9.3" % "test"
       )))
     )
-  ).dependsOn(core)
+    dependsOn core % "compile -> compile; test -> test"
+  )
+
+  lazy val json4s = (project in file("json4s")
+    settings(commonSettings: _*)
+    //    settings(Publishing.settings: _*)
+    settings(
+      libraryDependencies <++= scalaVersion(dependencies("2.12.3" → List(
+        "org.json4s" %% "json4s-core"   % "3.6.0",
+        "org.json4s" %% "json4s-native" % "3.6.0" % "test"
+      )))
+    )
+    dependsOn core % "compile -> compile; test -> test"
+  )
 
   private def commonSettings = Seq(
 //    moduleName                <<= name("jsondbc-" + _),

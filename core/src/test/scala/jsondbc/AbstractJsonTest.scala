@@ -27,25 +27,31 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
 
   "filterNulls" in {
-    test(_.filterNulls,
-      """null"""                        → """null""",
-      """{ "a": null, "b": 3 }"""       → """{ "b": 3 }""",
-      """[ "a", null, "b" ]"""          → """[ "a", "b" ]""",
-      """{ "o": [ "a", null, "b" ] }""" → """{ "o": [ "a", "b" ] }""",
-      """[ { "a": null, "b": 3 } ]"""   → """[ { "b": 3 } ]"""
-    )
+    val jNull = spi.jNull(())
+
+    List(
+      jNull                                         -> jNull,
+      obj("a" -> jNull, "b" -> j123)                -> obj("b" -> j123),
+      jArray(List(jString("a"), jNull))             -> jArray(List(jString("a"))),
+      obj("o" -> jArray(List(jString("a"), jNull))) -> obj("o" -> jArray(List(jString("a")))),
+      jArray(List(obj("a" -> jNull, "b" -> j123)))  -> jArray(List(obj("b" -> j123)))
+    ).foreach {
+      case (input, expected) => input.filterNulls <=> expected
+    }
   }
 
   "filterRecursive" in {
-    val emptyObject = obj()
+    val jEmpty = obj()
 
-    test(_.filterRecursive(_ != emptyObject),
-      """{}"""                        → """null""",
-      """{ "a": {}, "b": 3 }"""       → """{ "b": 3 }""",
-      """[ "a", {}, "b" ]"""          → """[ "a", "b" ]""",
-      """{ "o": [ "a", {}, "b" ] }""" → """{ "o": [ "a", "b" ] }""",
-      """[ { "a": {}, "b": 3 } ]"""   → """[ { "b": 3 } ]"""
-    )
+    List(
+      jEmpty                                         -> jNull(()),
+      obj("a" -> jEmpty, "b" -> j123)                -> obj("b" -> j123),
+      jArray(List(jString("a"), jEmpty))             -> jArray(List(jString("a"))),
+      obj("o" -> jArray(List(jString("a"), jEmpty))) -> obj("o" -> jArray(List(jString("a")))),
+      jArray(List(obj("a" -> jEmpty, "b" -> j123)))  -> jArray(List(obj("b" -> j123)))
+    ).foreach {
+      case (input, expected) => input.filterRecursive(_ != jEmpty) <=> expected
+    }
   }
 
   "renameFields" in {
@@ -72,7 +78,7 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
       jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj
 
       jobj.descendant("$.age").int.getAll <=> List(3)
-      jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jLong(6)) ->: jobj
+      jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jInt(6)) ->: jobj
     }
 
     "elements" in {
@@ -268,12 +274,6 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
     json.descendant("$.people[?(@.person.name == 'Arnie')].address").getAll <=> List(jString("California"))
   }
-
-
-
-  protected def test(f: J ⇒ J, data: (String, String)*): Unit = data.foreach {
-    case (input, expected) ⇒ f(parse(input)) <=> parse(expected)
-  }
 }
 
 abstract class JsonUtil[J: SPI] extends FreeSpecLike {
@@ -344,7 +344,8 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike {
 
   def reverseEntry(key: String, value: String): (String, String) = (key.reverse, value.reverse)
 
-  def print(values: List[J]): Unit
+  def print(j: J): Unit
+  final def print(values: List[J]): Unit = values.foreach(print)
 //  def print(values: List[Json]): Unit = values.foreach(j ⇒ println(j.spaces2))
 
 }

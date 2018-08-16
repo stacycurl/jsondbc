@@ -62,7 +62,7 @@ trait SpraySPI {
       }
     }
 
-    override def filterObject(p: String => Boolean): Traversal[JsObject, JsValue] = {
+    def filterObject(p: String => Boolean): Traversal[JsObject, JsValue] = {
       new PTraversal[JsObject, JsObject, JsValue, JsValue] {
         import scalaz.std.list._
         import scalaz.syntax.applicative._
