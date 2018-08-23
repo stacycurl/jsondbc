@@ -401,5 +401,4 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike {
   def print(j: J): Unit
   final def print(values: List[J]): Unit = values.foreach(print)
 //  def print(values: List[Json]): Unit = values.foreach(j ⇒ println(j.spaces2))
-
 }

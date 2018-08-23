@@ -15,6 +15,43 @@ import jsondbc.syntax.generic._
 class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
   import spi._
 
+  "descendant_case_class" - {
+    val bananaMan = Bananaman(
+      "Eric", lying = true, 3, Map("bananas" -> true),
+      Address(List("29 Acacia Road", "Nuttytown")), 33.5, Map(), Nil, Map("1" -> "one")
+    )
+
+    "complex" in {
+      val actual = bananaMan
+        .descendant("$.preferences.*").bool.set(false)
+        .descendant("$.address").array.string.modify("Flat B" :: _)
+        .descendant("$.address[*]").string.modify(_.toUpperCase)
+        .descendant("$.potatoes.*.variety").string.modify(_ ⇒ "Avalanche")
+        .descendant("$.knownUnknowns.*").int.modify(_ ⇒ 42)
+        .descendant("$.awkward.*").string.modify(_.toUpperCase)
+
+      actual <=> Bananaman(
+        "Eric", lying = true, 3, Map("bananas" -> false),
+        Address(List("FLAT B", "29 ACACIA ROAD", "NUTTYTOWN")), 33.5, Map(), Nil, Map("1" -> "ONE")
+      )
+    }
+
+    "dynamic" in {
+      val actual = bananaMan
+        .descendant.preferences.each.bool.set(false)
+        .descendant.address.array.string.modify("Flat B" :: _)
+        .descendant.address.each.string.modify(_.toUpperCase)
+        .descendant.potatoes.each.variety.string.modify(_ ⇒ "Avalanche")
+        .descendant.knownUnknowns.each.int.modify(_ ⇒ 42)
+        .descendant.awkward.each.string.modify(_.toUpperCase)
+
+      actual <=> Bananaman(
+        "Eric", lying = true, 3, Map("bananas" -> false),
+        Address(List("FLAT B", "29 ACACIA ROAD", "NUTTYTOWN")), 33.5, Map(), Nil, Map("1" -> "ONE")
+      )
+    }
+  }
+
   "descendant_ancestors" in {
     jobj.descendant("$.preferences.bananas").string.ancestors <=> obj(
       "$"                     -> Json.jArray(jobj.descendant("$").getAll),
@@ -91,8 +128,6 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
       }
     }""")
   }
-
-
 }
 
 
@@ -149,13 +184,23 @@ trait ArgonautJsonUtil extends JsonUtil[Json] {
   val derived = Derived(123)
   val derivedEncoded = Derived.codec.encode(derived)
 
+  case class Bananaman(
+    name: String, lying: Boolean, age: Int, preferences: Map[String, Boolean], address: Address,
+    width: Double, knownUnknowns: Map[String, String], potatoes: List[String], awkward: Map[String, String]
+  )
+
   case class Address(lines: List[String]) {
     def reverse: Address = copy(lines.reverse)
   }
 
   object Address {
-    implicit val addressCodec: CodecJson[Address] =
-      CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
-  }
-}
 
+  }
+
+  implicit val bananamanCodec: CodecJson[Bananaman] = CodecJson.casecodec9(Bananaman.apply, Bananaman.unapply)(
+    "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"
+  )
+
+  implicit val addressCodec: CodecJson[Address] =
+    CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
+}

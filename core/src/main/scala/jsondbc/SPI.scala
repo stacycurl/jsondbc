@@ -1,13 +1,11 @@
 package jsondbc
 
-import monocle.{Iso, Prism, Traversal}
+import monocle.{Iso, Optional, Prism, Traversal}
 
 
 trait SPI[J] {
   type JsonObject
   type JsonNumber
-
-  def arrayCPF[That]: CanPrismFrom[J, List[J], List[J]] = ???
 
   // Helpers
   final def filterKeys(j: J, p: String => Boolean): J = mapMap(j, _.filter { case (key, _) => p(key) })
@@ -41,6 +39,9 @@ trait SPI[J] {
     }
   })
 
+  final def mapValuesWithKey(j: J, f: String => J => J): J =
+    mapMap(j, _.map { case (k, v) => (k, f(k)(v)) })
+
   private def mapList(j: J, f: List[J] => List[J]): J =
     jArray.modify(f).apply(j)
 
@@ -70,10 +71,28 @@ trait SPI[J] {
   def jObjectValues: Traversal[JsonObject, J]
 
   def filterObject(p: String => Boolean): Traversal[JsonObject, J]
+
+  def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
+    Traversal.id[A] composeOptional optional(codec)
+
+  def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
+    Optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
 }
 
 object SPI {
   def apply[J](implicit spi: SPI[J]): Aux[J, spi.JsonObject] = spi
 
   type Aux[J, JsonObject0] = SPI[J] { type JsonObject = JsonObject0 }
+
+  trait Codec[A, J] {
+    def encode(a: A): J
+    def decode(j: J): Either[String, A]
+  }
+
+  object Codec {
+    implicit def identityCodec[J]: Codec[J, J] = new Codec[J, J] {
+      def encode(j: J): J = j
+      def decode(j: J) = Right(j)
+    }
+  }
 }

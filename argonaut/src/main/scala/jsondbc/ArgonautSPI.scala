@@ -6,6 +6,11 @@ import monocle.{Iso, Prism, Traversal}
 
 object ArgonautSPI extends ArgonautSPI
 trait ArgonautSPI {
+  implicit def argonautCodecs[A: CodecJson]: SPI.Codec[A, Json] = new SPI.Codec[A, Json] {
+    def encode(a: A): Json = CodecJson.derived[A].encode(a)
+    def decode(j: Json): Either[String, A] = CodecJson.derived[A].decodeJson(j).toEither.left.map(_._1)
+  }
+
   implicit val argonautSPI: Aux[Json, JsonObject] = new SPI[Json] {
     type JsonObject = argonaut.JsonObject
     type JsonNumber = argonaut.JsonNumber

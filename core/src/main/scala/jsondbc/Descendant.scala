@@ -1,7 +1,5 @@
 package jsondbc
 
-import monocle.function.FilterIndex
-
 import scala.language.{dynamics, higherKinds, implicitConversions}
 import monocle.{Iso, Optional, Prism, Traversal}
 

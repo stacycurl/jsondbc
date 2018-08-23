@@ -15,24 +15,6 @@ object argonaut extends ArgonautSPI {
     def as[A: CodecJson]: As[From, Via, To, A] = As[From, Via, To, A](self)
   }
 
-  implicit class JsonFrills(val self: Json) extends AnyVal {
-    def mapValuesWithKey(f: String => Json => Json): Json = self.withObject(_.mapValuesWithKey(f))
-
-//    def delete(path: String): Json = {
-//      path.split("/").toList.reverse match {
-//        case head :: Nil ⇒ descendant("").obj.delete(head)
-//        case head :: tail ⇒ descendant(tail.reverse.mkString("/")).obj.delete(head)
-//        case _ ⇒ Json.jNull
-//      }
-//    }
-
-    def filterR(p: Json => Boolean): Json = if (p(self)) {
-      self.withObject(_.filterR(p)).withArray(_.filterR(p))
-    } else {
-      jNull
-    }
-  }
-
   implicit class CodecJsonFrills[A](val self: CodecJson[A]) extends AnyVal {
     def renameFields(fromTos: (String, String)*): CodecJson[A] = afterEncode(_.renameFields(fromTos: _*))
     def addIfMissing(assocs: Json.JsonAssoc*):    CodecJson[A] = afterEncode(_.addIfMissing(assocs: _*))
@@ -103,70 +85,6 @@ object argonaut extends ArgonautSPI {
 
     def contramapKeys[C](f: C ⇒ K):   EncodeJson[Map[C, V]] = self.contramap[Map[C, V]](_.map { case (k, v) => f(k) -> v })
     def contramapValues[W](f: W ⇒ V): EncodeJson[Map[K, W]] = self.contramap[Map[K, W]](_.map { case (k, v) => k -> f(v) })
-  }
-
-  implicit class TraversalFrills[A, B](val self: Traversal[A, B]) extends AnyVal {
-    def bool[That](  implicit cpf: CanPrismFrom[B, Boolean,    That]): Traversal[A, That] = apply(cpf)
-    def number[That](implicit cpf: CanPrismFrom[B, JsonNumber, That]): Traversal[A, That] = apply(cpf)
-    def string[That](implicit cpf: CanPrismFrom[B, String,     That]): Traversal[A, That] = apply(cpf)
-    def array[That]( implicit cpf: CanPrismFrom[B, List[Json], That]): Traversal[A, That] = apply(cpf)
-    def obj[That](   implicit cpf: CanPrismFrom[B, JsonObject, That]): Traversal[A, That] = apply(cpf)
-
-    def double[That](    implicit cpf: CanPrismFrom[B, Double,     That]): Traversal[A, That] = apply(cpf)
-    def int[That](       implicit cpf: CanPrismFrom[B, Int,        That]): Traversal[A, That] = apply(cpf)
-    def float[That](     implicit cpf: CanPrismFrom[B, Float,      That]): Traversal[A, That] = apply(cpf)
-    def short[That](     implicit cpf: CanPrismFrom[B, Short,      That]): Traversal[A, That] = apply(cpf)
-    def byte[That](      implicit cpf: CanPrismFrom[B, Byte,       That]): Traversal[A, That] = apply(cpf)
-    def bigDecimal[That](implicit cpf: CanPrismFrom[B, BigDecimal, That]): Traversal[A, That] = apply(cpf)
-    def bigInt[That](    implicit cpf: CanPrismFrom[B, BigInt,     That]): Traversal[A, That] = apply(cpf)
-
-    private def apply[Elem, That](canPrismFrom: CanPrismFrom[B, Elem, That]): Traversal[A, That] =
-      self composePrism canPrismFrom.prism
-  }
-
-  implicit class JsonObjectFrills(val self: JsonObject) extends AnyVal {
-    def removeFields(names: String*):        JsonObject = filterKeysNot(names.toSet)
-    def filterKeys(p: String => Boolean):    JsonObject = mapMap(_.filterKeys(p))
-    def filterKeysNot(p: String => Boolean): JsonObject = mapMap(_.filterNot(kv ⇒ p(kv._1)))
-    def filterValues(p: Json => Boolean):    JsonObject = mapMap(_.filter(kv ⇒ p(kv._2)))
-    def filterValuesNot(p: Json => Boolean): JsonObject = mapMap(_.filterNot(kv ⇒ p(kv._2)))
-
-    def mapValuesWithKey(f: String => Json => Json): JsonObject = mapMap(_.map { case (k, v) => (k, f(k)(v)) })
-
-    def renameFields(fromTos: (String, String)*): JsonObject = fromTos.foldLeft(self) {
-      case (acc, (from, to)) ⇒ acc.renameFields(from, to)
-    }
-
-    private def renameFields(from: String, to: String): JsonObject =
-      self(from).fold(self)(value ⇒ (self - from) + (to, value))
-
-
-    def addIfMissing(assocs: Json.JsonAssoc*): JsonObject = assocs.foldLeft(self) {
-      case (acc, (name, value)) ⇒ acc.addIfMissing(name, value)
-    }
-
-    private def addIfMissing(name: String, value: Json): JsonObject =
-      self(name).fold(self + (name, value))(_ ⇒ self)
-
-
-    def filterR(p: Json => Boolean): JsonObject = mapMap(_.collect {
-      case (k, j) if p(j) => k -> j.filterR(p)
-    })
-
-    private def mapMap(f: Map[String, Json] ⇒ Map[String, Json]): JsonObject =
-      JsonObject.fromTraversableOnce(f(self.toMap))
-  }
-
-  implicit class TraversalToJsonFrills[A](val self: Traversal[A, Json]) extends AnyVal {
-    def renameFields(fromTos: (String, String)*): Traversal[A, Json] =
-      self composeIso Iso[Json, Json](_.renameFields(fromTos: _*))(_.renameFields(fromTos.map(_.swap): _*))
-
-    def descendant(path: String): Traversal[A, Json] =
-      jsondbc.JsonPath.traversal(self, path)
-  }
-
-  implicit class JsonArrayFrills(val self: List[Json]) extends AnyVal {
-    def filterR(p: Json => Boolean): List[Json] = self.collect { case j if p(j) ⇒ j.filterR(p) }
   }
 
   implicit class DescendantViaJsonFrills[From, To](self: Descendant[From, Json, To]) {
