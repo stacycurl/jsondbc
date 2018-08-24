@@ -57,3 +57,18 @@ case class Descendant[From, Via, To](
   private def withTraversal[That](fn: Traversal[From, To] => Traversal[From, That]): Descendant[From, Via, That] =
     copy(traversals = traversals.map(fn))
 }
+
+object Descendant {
+  implicit class DescendantViaJsonFrills[From, J, To](self: Descendant[From, J, To]) {
+    def firstEmptyAt(implicit spi: SPI[J]): Option[String] = ancestorsList.collectFirst {
+      case (path, Nil) => path
+    }
+
+    def ancestors(implicit spi: SPI[J]): J =
+      spi.jObject(ancestorsList.map { case (k, v) => k -> spi.jArray(v) }: _*)
+
+    private def ancestorsList(implicit spi: SPI[J]): List[(String, List[J])] =
+      self.ancestorsFn().map { case (k, ancestor) => k -> ancestor.getAll(self.from) }
+  }
+
+}

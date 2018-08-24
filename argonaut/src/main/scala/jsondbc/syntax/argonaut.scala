@@ -1,13 +1,12 @@
 package jsondbc.syntax
 
-import _root_.argonaut.Json._
-import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json, JsonNumber, JsonObject}
+import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json}
 import jsondbc.syntax.generic._
 import jsondbc.{ArgonautSPI, CanPrismFrom, Descendant}
 import monocle._
+import scalaz.\/
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
-import scalaz.\/
 
 object argonaut extends ArgonautSPI {
 
@@ -85,18 +84,6 @@ object argonaut extends ArgonautSPI {
 
     def contramapKeys[C](f: C ⇒ K):   EncodeJson[Map[C, V]] = self.contramap[Map[C, V]](_.map { case (k, v) => f(k) -> v })
     def contramapValues[W](f: W ⇒ V): EncodeJson[Map[K, W]] = self.contramap[Map[K, W]](_.map { case (k, v) => k -> f(v) })
-  }
-
-  implicit class DescendantViaJsonFrills[From, To](self: Descendant[From, Json, To]) {
-    def firstEmptyAt: Option[String] = ancestorsList.collectFirst {
-      case (path, Nil) => path
-    }
-
-    def ancestors: Json =
-      Json.jObjectAssocList(ancestorsList.map { case (k, v) => k -> Json.jArray(v) })
-
-    private def ancestorsList: List[(String, List[Json])] =
-      self.ancestorsFn().map { case (k, ancestor) => k -> ancestor.getAll(self.from) }
   }
 
   def filterObjectP(p: Json => Boolean): Prism[Json, Json] =

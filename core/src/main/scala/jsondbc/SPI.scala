@@ -42,11 +42,8 @@ trait SPI[J] {
   final def mapValuesWithKey(j: J, f: String => J => J): J =
     mapMap(j, _.map { case (k, v) => (k, f(k)(v)) })
 
-  private def mapList(j: J, f: List[J] => List[J]): J =
-    jArray.modify(f).apply(j)
-
-  private def mapMap(j: J, f: Map[String, J] => Map[String, J]): J =
-    (jObject composeIso jObjectMap).modify(f).apply(j)
+  final def jObject(entries: (String, J)*): J =
+    jObject.apply(jObjectMap.apply(entries.toMap))
 
   def jField(json: J, name: String): Option[J]
 
@@ -77,6 +74,12 @@ trait SPI[J] {
 
   def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
     Optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
+
+  private def mapList(j: J, f: List[J] => List[J]): J =
+    jArray.modify(f).apply(j)
+
+  private def mapMap(j: J, f: Map[String, J] => Map[String, J]): J =
+    (jObject composeIso jObjectMap).modify(f).apply(j)
 }
 
 object SPI {

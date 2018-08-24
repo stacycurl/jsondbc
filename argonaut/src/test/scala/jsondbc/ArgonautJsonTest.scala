@@ -52,21 +52,6 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
     }
   }
 
-  "descendant_ancestors" in {
-    jobj.descendant("$.preferences.bananas").string.ancestors <=> obj(
-      "$"                     -> Json.jArray(jobj.descendant("$").getAll),
-      "$.preferences"         -> Json.jArray(jobj.descendant("$.preferences").getAll),
-      "$.preferences.bananas" -> Json.jArray(jobj.descendant("$.preferences.bananas").getAll)
-    )
-  }
-
-  "descendant_firstEmptyAt" in {
-    jobj.descendant("$.preferences.bananas").firstEmptyAt <=> None
-    jobj.descendant("$.preferences.apples") .firstEmptyAt <=> Some("$.preferences.apples")
-    jobj.descendant("$.pref.apples")        .firstEmptyAt <=> Some("$.pref")
-  }
-
-
   "as" in {
     jobj.descendant("$.address").as[Address].getAll            <=> List(Address(List("29 Acacia Road", "Nuttytown")))
     jobj.descendant("$.address").as[Address].modify(_.reverse) <=> jobj.descendant("$.address").array.modify(_.reverse)
@@ -130,34 +115,6 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
   }
 }
 
-
-class JsonObjectTest extends JsonUtil()(ArgonautSPI.argonautSPI) with ArgonautJsonUtil with FreeSpecLike {
-  import spi._
-
-  "renameFields" in {
-    obj("original" := true)       .withObject(_.renameFields("original" -> "renamed")) <=> obj("renamed" := true)
-    obj("a" := true, "b" := false).withObject(_.renameFields("a" → "A", "b" → "B"))    <=> obj("A" := true, "B" := false)
-  }
-
-  "addIfMissing" in {
-    on(
-      obj(),     obj("a" := jExisting)
-    ).calling(_.withObject(_.addIfMissing("a" := jAdded))).produces(
-      obj("a" := jAdded), obj("a" := jExisting)
-    )
-  }
-
-  "addIfMissing_many" in {
-    on(
-      obj(),        obj("a" := jExisting),
-      obj("b" := jExisting), obj("a" := jExisting, "b" := jExisting)
-    ).calling(_.withObject(_.addIfMissing("a" := jAdded, "b" := jAdded))).produces(
-      obj("a" := jAdded, "b" := jAdded),    obj("a" := jExisting, "b" := jAdded),
-      obj("a" := jAdded, "b" := jExisting), obj("a" := jExisting, "b" := jExisting)
-    )
-  }
-}
-
 trait ArgonautJsonUtil extends JsonUtil[Json] {
   def print(j: Json): Unit = println(j.spaces2)
 
@@ -189,18 +146,18 @@ trait ArgonautJsonUtil extends JsonUtil[Json] {
     width: Double, knownUnknowns: Map[String, String], potatoes: List[String], awkward: Map[String, String]
   )
 
+  object Bananaman {
+    implicit val bananamanCodec: CodecJson[Bananaman] = CodecJson.casecodec9(Bananaman.apply, Bananaman.unapply)(
+      "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"
+    )
+  }
+
   case class Address(lines: List[String]) {
     def reverse: Address = copy(lines.reverse)
   }
 
   object Address {
-
+    implicit val addressCodec: CodecJson[Address] =
+      CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
   }
-
-  implicit val bananamanCodec: CodecJson[Bananaman] = CodecJson.casecodec9(Bananaman.apply, Bananaman.unapply)(
-    "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"
-  )
-
-  implicit val addressCodec: CodecJson[Address] =
-    CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
 }

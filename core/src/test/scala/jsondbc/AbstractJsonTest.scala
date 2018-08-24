@@ -190,6 +190,20 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
             |}""".stripMargin
           )
     }
+
+    "descendant_ancestors" in {
+      jobj.descendant("$.preferences.bananas").string.ancestors <=> obj(
+        "$"                     -> spi.jArray(jobj.descendant("$").getAll),
+        "$.preferences"         -> spi.jArray(jobj.descendant("$.preferences").getAll),
+        "$.preferences.bananas" -> spi.jArray(jobj.descendant("$.preferences.bananas").getAll)
+      )
+    }
+
+    "descendant_firstEmptyAt" in {
+      assert(jobj.descendant("$.preferences.bananas").firstEmptyAt === None)
+      assert(jobj.descendant("$.preferences.apples") .firstEmptyAt === Some("$.preferences.apples"))
+      assert(jobj.descendant("$.pref.apples")        .firstEmptyAt === Some("$.pref"))
+    }
   }
 
   "booleanFilter" in {
