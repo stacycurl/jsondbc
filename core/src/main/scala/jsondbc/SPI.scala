@@ -93,9 +93,12 @@ object SPI {
   }
 
   object Codec {
+    def apply[A, J](implicit c: Codec[A, J]): Codec[A, J] = c
+
     implicit def identityCodec[J]: Codec[J, J] = new Codec[J, J] {
       def encode(j: J): J = j
       def decode(j: J) = Right(j)
     }
+
   }
 }

@@ -35,6 +35,8 @@ case class Descendant[From, Via, To](
   def bigDecimal[That](implicit cpf: CanPrismFrom[To, BigDecimal, That]): Descendant[From, Via, That] = apply(cpf)
   def bigInt[That](    implicit cpf: CanPrismFrom[To, BigInt,     That]): Descendant[From, Via, That] = apply(cpf)
 
+  def as[A](implicit codec: SPI.Codec[A, To]): As[From, Via, To, A] = As[From, Via, To, A](this)
+
   private def apply[Elem, That](cpf: CanPrismFrom[To, Elem, That]): Descendant[From, Via, That] = composePrism(cpf.prism)
 
   def composePrism[That](next: Prism[To, That]):         Descendant[From, Via, That] = withTraversal(_ composePrism next)
@@ -71,4 +73,11 @@ object Descendant {
       self.ancestorsFn().map { case (k, ancestor) => k -> ancestor.getAll(self.from) }
   }
 
+}
+
+case class As[From, Via, To, A](from: Descendant[From, Via, To])
+
+object As {
+  implicit def asToDescendant[From, Via, To, A, That](as: As[From, Via, To, A])
+    (implicit cpf: CanPrismFrom[To, A, That]): Descendant[From, Via, That] = as.from.composePrism(cpf.prism)
 }

@@ -1,11 +1,7 @@
 package jsondbc
 
-//import argonaut.Json._
-import argonaut.StringWrap.StringToStringWrap
 import argonaut._
-import jsondbc.SPI.Aux
 import jsondbc.syntax.argonaut._
-import org.scalatest.FreeSpecLike
 import sjc.delta.argonaut.json.actualExpected.flat._
 import sjc.delta.argonaut.matchers._
 import sjc.delta.matchers.syntax.anyDeltaMatcherOps
@@ -13,8 +9,6 @@ import sjc.delta.matchers.syntax.anyDeltaMatcherOps
 import jsondbc.syntax.generic._
 
 class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
-  import spi._
-
   "descendant_case_class" - {
     val bananaMan = Bananaman(
       "Eric", lying = true, 3, Map("bananas" -> true),
@@ -56,63 +50,6 @@ class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
     jobj.descendant("$.address").as[Address].getAll            <=> List(Address(List("29 Acacia Road", "Nuttytown")))
     jobj.descendant("$.address").as[Address].modify(_.reverse) <=> jobj.descendant("$.address").array.modify(_.reverse)
   }
-
-  "delete" in {//    println(parse(
-//      """{
-//        |   "a": {
-//        |     "nested": {
-//        |       "thing": "bye bye"
-//        |     }
-//        |   },
-//        |   "remainder": "still here"
-//        |}
-//      """.stripMargin).delete("a/nested/thing").spaces2)
-//
-//    println(parse("""{"candy": "lollipop", "noncandy": null,"other": "things"}""")
-//      .descendant("candy").string.set("big turks").filterNulls
-//      .delete("other").spaces2)
-//
-
-//    store.jsonPath("$.store.book[*].author").getAll.foreach(j ⇒ println(j.spaces2))
-
-
-
-    val conditions = parse("""{ "conditions":
-          			[
-          				{ "id": "i1", "condition": true },
-          				{ "id": "i2", "condition": false }
-          			]
-          		}""")
-
-    Json.jArray(conditions.descendant("$.conditions[?(@['condition'] == true)].id").getAll)  <=> parse("""["i1"]""")
-    Json.jArray(conditions.descendant("$.conditions[?(@['condition'] == false)].id").getAll) <=> parse("""["i2"]""")
-
-    conditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" := true)) <=> parse("""{
-      "conditions": [
-        { "id": "i1", "condition": true, "matched": true },
-        { "id": "i2", "condition": false }
-      ]
-    }""")
-
-
-
-    val objConditions = parse("""{ "conditions":
-        {
-          "first": { "id": "i1", "condition": true },
-          "second": { "id": "i2", "condition": false }
-        }
-      }""")
-
-    Json.jArray(objConditions.descendant("$.conditions[?(@['condition'] == true)].id").getAll)  <=> parse("""["i1"]""")
-    Json.jArray(objConditions.descendant("$.conditions[?(@['condition'] == false)].id").getAll) <=> parse("""["i2"]""")
-
-    objConditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" := true)) <=> parse("""{
-      "conditions": {
-        "first": { "id": "i1", "condition": true, "matched": true },
-        "second": { "id": "i2", "condition": false }
-      }
-    }""")
-  }
 }
 
 trait ArgonautJsonUtil extends JsonUtil[Json] {
@@ -141,23 +78,10 @@ trait ArgonautJsonUtil extends JsonUtil[Json] {
   val derived = Derived(123)
   val derivedEncoded = Derived.codec.encode(derived)
 
-  case class Bananaman(
-    name: String, lying: Boolean, age: Int, preferences: Map[String, Boolean], address: Address,
-    width: Double, knownUnknowns: Map[String, String], potatoes: List[String], awkward: Map[String, String]
+  implicit val addressCodec: CodecJson[Address] =
+    CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
+
+  implicit val bananamanCodec: CodecJson[Bananaman] = CodecJson.casecodec9(Bananaman.apply, Bananaman.unapply)(
+    "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"
   )
-
-  object Bananaman {
-    implicit val bananamanCodec: CodecJson[Bananaman] = CodecJson.casecodec9(Bananaman.apply, Bananaman.unapply)(
-      "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"
-    )
-  }
-
-  case class Address(lines: List[String]) {
-    def reverse: Address = copy(lines.reverse)
-  }
-
-  object Address {
-    implicit val addressCodec: CodecJson[Address] =
-      CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
-  }
 }

@@ -38,4 +38,7 @@ object CanPrismFrom {
   implicit def cpfm[From, Elem, To](
     implicit cpf: CanPrismFrom[From, Elem, To]
   ): CanPrismFrom[Map[String, From], Elem, Map[String, To]] = cpf.toMap
+
+  implicit def cpfToCodec[A, J](implicit codec: SPI.Codec[A, J]): CanPrismFrom[J, A, A] =
+    CanPrismFrom(Prism[J, A](json => codec.decode(json).toOption)(codec.encode))
 }

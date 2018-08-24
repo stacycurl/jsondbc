@@ -11,7 +11,6 @@ import scala.language.{dynamics, higherKinds, implicitConversions}
 object argonaut extends ArgonautSPI {
 
   implicit class DescendantFrills[From, Via, To](val self: Descendant[From, Via, To]) extends AnyVal {
-    def as[A: CodecJson]: As[From, Via, To, A] = As[From, Via, To, A](self)
   }
 
   implicit class CodecJsonFrills[A](val self: CodecJson[A]) extends AnyVal {
@@ -89,10 +88,4 @@ object argonaut extends ArgonautSPI {
   def filterObjectP(p: Json => Boolean): Prism[Json, Json] =
     Prism[Json, Json](json ⇒ Some(json).filter(p))(json ⇒ json)
 
-  case class As[From, Via, To, A: CodecJson](from: Descendant[From, Via, To])
-
-  object As {
-    implicit def asToDescendant[From, Via, To, A, That](as: As[From, Via, To, A])
-      (implicit cpf: CanPrismFrom[To, A, That]): Descendant[From, Via, That] = as.from.composePrism(cpf.prism)
-  }
 }

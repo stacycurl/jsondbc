@@ -342,6 +342,64 @@ abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
     json.descendant("$.people[?(@.person.name == 'Arnie')].address").getAll <=> List(jString("California"))
   }
+
+  "delete" in {
+    //    println(parse(
+//      """{
+//        |   "a": {
+//        |     "nested": {
+//        |       "thing": "bye bye"
+//        |     }
+//        |   },
+//        |   "remainder": "still here"
+//        |}
+//      """.stripMargin).delete("a/nested/thing").spaces2)
+//
+//    println(parse("""{"candy": "lollipop", "noncandy": null,"other": "things"}""")
+//      .descendant("candy").string.set("big turks").filterNulls
+//      .delete("other").spaces2)
+//
+
+//    store.jsonPath("$.store.book[*].author").getAll.foreach(j ⇒ println(j.spaces2))
+
+
+
+    val conditions = parse("""{ "conditions":
+          			[
+          				{ "id": "i1", "condition": true },
+          				{ "id": "i2", "condition": false }
+          			]
+          		}""")
+
+    jArray(conditions.descendant("$.conditions[?(@['condition'] == true)].id").getAll)  <=> parse("""["i1"]""")
+    jArray(conditions.descendant("$.conditions[?(@['condition'] == false)].id").getAll) <=> parse("""["i2"]""")
+
+    conditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" -> jTrue)) <=> parse("""{
+      "conditions": [
+        { "id": "i1", "condition": true, "matched": true },
+        { "id": "i2", "condition": false }
+      ]
+    }""")
+
+
+
+    val objConditions = parse("""{ "conditions":
+        {
+          "first": { "id": "i1", "condition": true },
+          "second": { "id": "i2", "condition": false }
+        }
+      }""")
+
+    jArray(objConditions.descendant("$.conditions[?(@['condition'] == true)].id").getAll)  <=> parse("""["i1"]""")
+    jArray(objConditions.descendant("$.conditions[?(@['condition'] == false)].id").getAll) <=> parse("""["i2"]""")
+
+    objConditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" -> jTrue)) <=> parse("""{
+      "conditions": {
+        "first": { "id": "i1", "condition": true, "matched": true },
+        "second": { "id": "i2", "condition": false }
+      }
+    }""")
+  }
 }
 
 abstract class JsonUtil[J: SPI] extends FreeSpecLike {
@@ -415,4 +473,13 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike {
   def print(j: J): Unit
   final def print(values: List[J]): Unit = values.foreach(print)
 //  def print(values: List[Json]): Unit = values.foreach(j ⇒ println(j.spaces2))
+}
+
+case class Bananaman(
+  name: String, lying: Boolean, age: Int, preferences: Map[String, Boolean], address: Address,
+  width: Double, knownUnknowns: Map[String, String], potatoes: List[String], awkward: Map[String, String]
+)
+
+case class Address(lines: List[String]) {
+  def reverse: Address = copy(lines.reverse)
 }
