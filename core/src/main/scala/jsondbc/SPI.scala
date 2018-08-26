@@ -13,7 +13,7 @@ trait SPI[J] {
   final def filterValues(j: J, p: J => Boolean): J = mapMap(j, _.filter { case (_, v) => p(v) })
   final def filterValuesNot(j: J, p: J => Boolean): J = mapMap(j, _.filterNot { case (_, v) => p(v) })
 
-  def filterRecursive(j: J, p: J => Boolean): J = if (p(j)) {
+  final def filterRecursive(j: J, p: J => Boolean): J = if (p(j)) {
     val mapMapped = mapMap(j, _.collect {
       case (k, v) if p(v) => k -> filterRecursive(v, p)
     })
@@ -25,7 +25,7 @@ trait SPI[J] {
     jNull.apply(())
   }
 
-  def removeFields(j: J, names: String*): J = mapMap(j, _.filterKeys(names.toSet))
+  final def removeFields(j: J, names: String*): J = mapMap(j, _.filterKeys(names.toSet))
 
   final def renameFields(j: J, fromTos: (String, String)*): J = mapMap(j, map => {
     fromTos.foldLeft(map) {
@@ -69,10 +69,10 @@ trait SPI[J] {
 
   def filterObject(p: String => Boolean): Traversal[JsonObject, J]
 
-  def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
+  final def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
     Traversal.id[A] composeOptional optional(codec)
 
-  def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
+  final def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
     Optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
 
   private def mapList(j: J, f: List[J] => List[J]): J =
@@ -83,9 +83,12 @@ trait SPI[J] {
 }
 
 object SPI {
-  def apply[J](implicit spi: SPI[J]): Aux[J, spi.JsonObject] = spi
+  def apply[J](implicit spi: SPI[J]): Aux[J, spi.JsonObject, spi.JsonNumber] = spi
 
-  type Aux[J, JsonObject0] = SPI[J] { type JsonObject = JsonObject0 }
+  type Aux[J, JsonObject0, JsonNumber0] = SPI[J] {
+    type JsonObject = JsonObject0
+    type JsonNumber = JsonNumber0
+  }
 
   trait Codec[A, J] {
     def encode(a: A): J
@@ -99,6 +102,5 @@ object SPI {
       def encode(j: J): J = j
       def decode(j: J) = Right(j)
     }
-
   }
 }

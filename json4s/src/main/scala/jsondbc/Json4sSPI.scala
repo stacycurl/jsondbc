@@ -9,7 +9,7 @@ import scala.language.higherKinds
 
 object Json4sSPI extends Json4sSPI
 trait Json4sSPI {
-  implicit val json4sSPI: SPI.Aux[JValue, JObject] = new SPI[JValue] {
+  implicit val json4sSPI: SPI.Aux[JValue, JObject, JDecimal] = new SPI[JValue] {
     type JsonObject = JObject
     type JsonNumber = JDecimal
 

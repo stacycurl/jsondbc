@@ -1,32 +1,26 @@
 package jsondbc.syntax
 
-import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json}
-import jsondbc.syntax.generic._
-import jsondbc.{ArgonautSPI, CanPrismFrom, Descendant}
-import monocle._
-import scalaz.\/
-
 import scala.language.{dynamics, higherKinds, implicitConversions}
 
+import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json}
+import jsondbc.ArgonautSPI
+import jsondbc.syntax.generic._
+import scalaz.\/
+
+
 object argonaut extends ArgonautSPI {
-
-  implicit class DescendantFrills[From, Via, To](val self: Descendant[From, Via, To]) extends AnyVal {
-  }
-
   implicit class CodecJsonFrills[A](val self: CodecJson[A]) extends AnyVal {
     def renameFields(fromTos: (String, String)*): CodecJson[A] = afterEncode(_.renameFields(fromTos: _*))
     def addIfMissing(assocs: Json.JsonAssoc*):    CodecJson[A] = afterEncode(_.addIfMissing(assocs: _*))
     def removeFields(names: String*):             CodecJson[A] = afterEncode(_.removeFields(names: _*))
 
-    def beforeDecode(f: Json ⇒ Json): CodecJson[A] = compose(f)
+    def beforeDecode(f: Json ⇒ Json): CodecJson[A] = derived(encoder ⇒ encoder)(_ beforeDecode f)
     def afterDecode(f: A ⇒ A):        CodecJson[A] = derived(encoder ⇒ encoder)(_ map f)
     def beforeEncode(f: A ⇒ A):       CodecJson[A] = derived(_ contramap f)(decoder ⇒ decoder)
-    def afterEncode(f: Json ⇒ Json):  CodecJson[A] = andThen(f)
-    def andThen(f: Json ⇒ Json):      CodecJson[A] = derived(_ andThen f)(decoder ⇒ decoder)
-    def compose(f: Json ⇒ Json):      CodecJson[A] = derived(encoder ⇒ encoder)(_ compose f)
-    def xmapDisjunction[B](f: A ⇒ String \/ B)(g: B ⇒ A): CodecJson[B] = derived(_ beforeEncode g)(_ afterDecode f)
+    def afterEncode(f: Json ⇒ Json):  CodecJson[A] = derived(_ afterEncode f)(decoder ⇒ decoder)
+    def xmapDisjunction[B](f: A ⇒ String \/ B)(g: B ⇒ A): CodecJson[B] = derived(_ contramap g)(_ afterDecodeD f)
 
-    private[argonaut] def derived[B](f: EncodeJson[A] ⇒ EncodeJson[B])(g: DecodeJson[A] ⇒ DecodeJson[B]) =
+    private[argonaut] def derived[B](f: EncodeJson[A] ⇒ EncodeJson[B])(g: DecodeJson[A] ⇒ DecodeJson[B]): CodecJson[B] =
       CodecJson.derived[B](f(self.Encoder), g(self.Decoder))
   }
 
@@ -43,11 +37,11 @@ object argonaut extends ArgonautSPI {
     def addIfMissing(assocs: Json.JsonAssoc*):    DecodeJson[A] = beforeDecode(_.addIfMissing(assocs: _*))
     def removeFields(names: String*):             DecodeJson[A] = beforeDecode(_.removeFields(names: _*))
 
-    def beforeDecode(f: Json ⇒ Json): DecodeJson[A] = compose(f)
-    def compose(f: Json ⇒ Json):      DecodeJson[A] = DecodeJson[A](hc ⇒ self.decode(hc >-> f))
+    def beforeDecode(f: Json ⇒ Json): DecodeJson[A] = DecodeJson[A](hc ⇒ self.decode(hc >-> f))
+    def afterDecode(f: A => A):       DecodeJson[A] = self map f
     def upcast[B >: A]:               DecodeJson[B] = self.map[B](a ⇒ a: B)
 
-    private[argonaut] def afterDecode[B](f: A ⇒ String \/ B): DecodeJson[B] = // Probably publish later
+    private[argonaut] def afterDecodeD[B](f: A ⇒ String \/ B): DecodeJson[B] = // Probably publish later
       DecodeJson[B](c ⇒ self.decode(c).flatMap(a ⇒ DecodeResult[B](f(a).leftMap(_ → c.history).toEither)))
   }
 
@@ -65,15 +59,13 @@ object argonaut extends ArgonautSPI {
     def addIfMissing(assocs: Json.JsonAssoc*):    EncodeJson[A] = afterEncode(_.addIfMissing(assocs: _*))
     def removeFields(names: String*):             EncodeJson[A] = afterEncode(_.removeFields(names: _*))
 
-    def afterEncode(f: Json ⇒ Json): EncodeJson[A] = andThen(f)
-    def andThen(f: Json ⇒ Json):     EncodeJson[A] = EncodeJson[A](a ⇒ f(self.encode(a)))
+    def afterEncode(f: Json ⇒ Json): EncodeJson[A] = EncodeJson[A](a ⇒ f(self.encode(a)))
+    def beforeEncode(f: A ⇒ A):      EncodeJson[A] = self contramap f
     def downcast[B <: A]:            EncodeJson[B] = self.contramap[B](b ⇒ b: A)
 
     def add(assocsFn: (A ⇒ Json.JsonAssoc)*): EncodeJson[A] = {
       EncodeJson[A](a ⇒ self.encode(a).addIfMissing(assocsFn.map(assoc ⇒ assoc.apply(a)): _*))
     }
-
-    private[argonaut] def beforeEncode[B](f: B ⇒ A): EncodeJson[B] = self contramap f // Probably publish later
   }
 
   implicit class EncodeJsonMapFrills[K, V](val self: EncodeJson[Map[K, V]]) extends AnyVal {
@@ -84,8 +76,4 @@ object argonaut extends ArgonautSPI {
     def contramapKeys[C](f: C ⇒ K):   EncodeJson[Map[C, V]] = self.contramap[Map[C, V]](_.map { case (k, v) => f(k) -> v })
     def contramapValues[W](f: W ⇒ V): EncodeJson[Map[K, W]] = self.contramap[Map[K, W]](_.map { case (k, v) => k -> f(v) })
   }
-
-  def filterObjectP(p: Json => Boolean): Prism[Json, Json] =
-    Prism[Json, Json](json ⇒ Some(json).filter(p))(json ⇒ json)
-
 }

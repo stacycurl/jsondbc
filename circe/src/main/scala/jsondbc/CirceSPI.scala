@@ -1,14 +1,14 @@
 package jsondbc
 
 import io.circe.optics.{JsonObjectOptics, JsonOptics}
-import io.circe.{Json, JsonObject}
+import io.circe.{Json, JsonNumber, JsonObject}
 import monocle.{Iso, Prism, Traversal}
 import jsondbc.SPI.Aux
 
 
 object CirceSPI extends CirceSPI
 trait CirceSPI {
-  implicit val circeSPI: Aux[Json, JsonObject] = new SPI[Json] {
+  implicit val circeSPI: Aux[Json, JsonObject, JsonNumber] = new SPI[Json] {
     type JsonObject = io.circe.JsonObject
     type JsonNumber = io.circe.JsonNumber
 
