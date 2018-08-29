@@ -4,7 +4,7 @@ import jsondbc.SpraySPI._
 import spray.json.{JsObject, JsValue, JsonParser}
 
 
-class SprayJsonTest extends AbstractJsonTest[JsValue] {
+class SprayJsonSpec extends AbstractJsonSpec[JsValue] {
   protected def append(to: JsValue, assoc: (String, JsValue)): JsValue = to match {
     case JsObject(objFields) => JsObject(objFields + assoc)
     case other => other

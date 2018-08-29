@@ -5,7 +5,7 @@ import io.circe.jawn.JawnParser
 import jsondbc.CirceSPI._
 
 
-class CirceJsonTest extends AbstractJsonTest[Json] {
+class CirceJsonSpec extends AbstractJsonSpec[Json] {
   protected def append(to: Json, assoc: (String, Json)): Json = to.mapObject(obj => assoc +: obj)
 
   protected def assertJsonEquals(actual: Json, expected: Json): Unit = {

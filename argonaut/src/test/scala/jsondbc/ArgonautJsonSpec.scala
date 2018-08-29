@@ -8,7 +8,7 @@ import sjc.delta.matchers.syntax.anyDeltaMatcherOps
 
 import jsondbc.syntax.generic._
 
-class ArgonautJsonTest extends AbstractJsonTest[Json] with ArgonautJsonUtil {
+class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil {
   "descendant_case_class" - {
     val bananaMan = Bananaman(
       "Eric", lying = true, 3, Map("bananas" -> true),

@@ -5,7 +5,7 @@ import org.json4s.{DefaultFormats, Diff, StringInput}
 
 import Json4sSPI._
 
-class Json4SJsonTest extends AbstractJsonTest[JValue] {
+class Json4SJsonSpec extends AbstractJsonSpec[JValue] {
   protected def append(to: JValue, assoc: (String, JValue)): JValue = to match {
     case JObject(objFields) => JObject(assoc :: objFields.filter { case (key, _) => key != assoc._1 })
     case other              => other

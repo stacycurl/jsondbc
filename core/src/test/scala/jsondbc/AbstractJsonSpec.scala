@@ -3,7 +3,7 @@ package jsondbc
 import jsondbc.syntax.generic._
 import org.scalatest.FreeSpecLike
 
-abstract class AbstractJsonTest[J: SPI] extends JsonUtil[J] with FreeSpecLike {
+abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   import spi._
 
   val (j123, j456) = (jLong(123), jLong(456))
