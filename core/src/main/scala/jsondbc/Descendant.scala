@@ -44,8 +44,8 @@ case class Descendant[From, Via, To](
   def composeOptional[That](next: Optional[To, That]):   Descendant[From, Via, That] = withTraversal(_ composeOptional next)
   def composeIso[That](next: Iso[To, That]):             Descendant[From, Via, That] = withTraversal(_ composeIso next)
 
-  def headOption: Option[To] = traversals.flatMap(_.headOption(from)).headOption
   def headOrElse(alternative: => To): To = headOption.getOrElse(alternative)
+  def headOption: Option[To] = traversals.flatMap(_.headOption(from)).headOption
 
   def getAll: List[To] = traversals.flatMap(_.getAll(from))
 

@@ -1,14 +1,14 @@
 package jsondbc
 
-import argonaut.{CodecJson, Json, JsonMonocle, JsonNumber, JsonObject, JsonObjectMonocle}
+import argonaut.{CodecJson, DecodeJson, EncodeJson, Json, JsonMonocle, JsonNumber, JsonObject, JsonObjectMonocle}
 import jsondbc.SPI.Aux
 import monocle.{Iso, Prism, Traversal}
 
 object ArgonautSPI extends ArgonautSPI
 trait ArgonautSPI {
-  implicit def argonautCodecs[A: CodecJson]: SPI.Codec[A, Json] = new SPI.Codec[A, Json] {
-    def encode(a: A): Json = CodecJson.derived[A].encode(a)
-    def decode(j: Json): Either[String, A] = CodecJson.derived[A].decodeJson(j).toEither.left.map(_._1)
+  implicit def argonautCodecs[A: EncodeJson: DecodeJson]: SPI.Codec[A, Json] = new SPI.Codec[A, Json] {
+    def encode(a: A): Json = EncodeJson.of[A].encode(a)
+    def decode(j: Json): Either[String, A] = DecodeJson.of[A].decodeJson(j).toEither.left.map(_._1)
   }
 
   implicit val argonautSPI: Aux[Json, JsonObject, JsonNumber] = new SPI[Json] {

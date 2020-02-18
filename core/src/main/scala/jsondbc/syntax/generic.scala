@@ -32,7 +32,7 @@ object generic {
     def removeFields(names: String*)(implicit spi: SPI[A]): A = spi.removeFields(self, names: _*)
     def renameFields(fromTos: (String, String)*)(implicit spi: SPI[A]): A = spi.renameFields(self, fromTos: _*)
 
-    def addIfMissing(assocs: (String, A)*)(implicit spi: SPI[A]): A= spi.addIfMissing(self, assocs: _*)
+    def addIfMissing(assocs: (String, A)*)(implicit spi: SPI[A]): A = spi.addIfMissing(self, assocs: _*)
 
     def mapValuesWithKey(f: String => A => A)(implicit spi: SPI[A]): A = spi.mapValuesWithKey(self, f)
 

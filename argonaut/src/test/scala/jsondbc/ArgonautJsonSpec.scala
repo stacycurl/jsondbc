@@ -2,13 +2,81 @@ package jsondbc
 
 import argonaut._
 import jsondbc.syntax.argonaut._
+import jsondbc.syntax.generic._
 import sjc.delta.argonaut.json.actualExpected.flat._
 import sjc.delta.argonaut.matchers._
 import sjc.delta.matchers.syntax.anyDeltaMatcherOps
 
-import jsondbc.syntax.generic._
-
 class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil {
+
+  "migrations codec" in {
+    val flat = Migration(
+      "$.foods.fruit"  -> Migration.UpperCase,
+      "$.foods.staple" -> Migration.Trim,
+      "$.foods.staple" -> Migration.Reverse,
+      "$.foods"        -> Migration.Rename("staple" -> "carbs")
+    )
+
+    flat shouldRoundTripTo Json.array(
+      obj("$.foods.fruit"  := "upper-case"),
+      obj("$.foods.staple" := "trim"),
+      obj("$.foods.staple" := "reverse"),
+      obj("$.foods"        := obj("rename" := obj("staple" := "carbs")))
+    )
+
+    val nested = Migration(
+      "$" -> Migration(
+        "$.foods" -> Migration(
+          "$.fruit"  -> Migration.UpperCase,
+          "$.staple" -> Migration(
+            "$" -> Migration.Trim,
+            "$" -> Migration.Reverse
+          ),
+          "$" -> Migration.Rename("staple" -> "carbs")
+        )
+      )
+    )
+
+    val n = Migration.nested(
+      "$.foods.fruit"  -> Migration.UpperCase,
+      "$.foods.staple" -> Migration.Trim,
+      "$.foods.staple" -> Migration.Reverse,
+      "$.foods"        -> Migration.Rename("staple" -> "carbs")
+    )
+
+    n <=> nested
+
+    nested shouldRoundTripTo Json.array(
+      obj("$" := List(
+        obj("$.foods" := List(
+          obj("$.fruit"  := "upper-case"),
+          obj("$.staple" := List(
+            obj("$" := "trim"),
+            obj("$" := "reverse")
+          )),
+          obj("$" := obj("rename" := obj("staple" := "carbs")))
+        ))
+      ))
+    )
+
+    val foods = obj(
+      "foods" := obj(
+        "fruit"  := "banana",
+        "staple" := "potato "
+      )
+    )
+
+    val migratedFoods = obj(
+      "foods" := obj(
+        "fruit" := "BANANA",
+        "carbs" := "otatop"
+      )
+    )
+
+    flat.apply(foods)   <=> migratedFoods
+    nested.apply(foods) <=> migratedFoods
+  }
+
   "descendant_case_class" - {
     val bananaMan = Bananaman(
       "Eric", lying = true, 3, Map("bananas" -> true),
@@ -79,7 +147,7 @@ trait ArgonautJsonUtil extends JsonUtil[Json] {
   val derivedEncoded = Derived.codec.encode(derived)
 
   implicit val addressCodec: CodecJson[Address] =
-    CodecJson.derived[List[String]].xmap[Address](Address(_))(_.lines)
+    CodecJson.derived[List[String]].xmap[Address](Address)(_.lines)
 
   implicit val bananamanCodec: CodecJson[Bananaman] = CodecJson.casecodec9(Bananaman.apply, Bananaman.unapply)(
     "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"

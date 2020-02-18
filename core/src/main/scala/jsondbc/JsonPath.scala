@@ -14,9 +14,9 @@ case object JsonPath {
   def ancestors[Json](path: String)(implicit spi: SPI[Json]): List[(String, Traversal[Json, Json])] = ancestors(Traversal.id[Json], path)
 
   def traversal[A, Json](from: Traversal[A, Json], path: String)(implicit spi: SPI[Json]): Traversal[A, Json] = {
-    new JP.Parser().compile(path) match {
-      case JP.Parser.Success(pathTokens, _) ⇒ JsonPath[A, Json].traversal(pathTokens, from)
-      case JP.Parser.NoSuccess(msg, _)      ⇒ sys.error(s"Could not parse json path: $path, $msg")
+    tokenize(path) match {
+      case Right(pathTokens) ⇒ JsonPath[A, Json].traversal(pathTokens, from)
+      case Left(msg)      ⇒ sys.error(msg)
     }
   }
 
@@ -25,6 +25,18 @@ case object JsonPath {
       case JP.Parser.Success(pathTokens, _) ⇒ JsonPath[A, Json].ancestors(pathTokens, from)
       case JP.Parser.NoSuccess(msg, _)      ⇒ sys.error(s"Could not parse json path: $path, $msg")
     }
+  }
+
+  def relativeAncestors[A, Json](path: String)(implicit spi: SPI[Json]): List[(String, Traversal[Json, Json])] = {
+    new JP.Parser().compile(path) match {
+      case JP.Parser.Success(pathTokens, _) ⇒ JsonPath[A, Json].relativeAncestors(pathTokens)
+      case JP.Parser.NoSuccess(msg, _)      ⇒ sys.error(s"Could not parse json path: $path, $msg")
+    }
+  }
+
+  def tokenize(path: String): Either[String, List[PathToken]] = new JP.Parser().compile(path) match {
+    case JP.Parser.Success(pathTokens, _) ⇒ Right(pathTokens)
+    case JP.Parser.NoSuccess(msg, _)      ⇒ Left(s"Could not parse json path: $path, $msg")
   }
 
   def apply[A, Json](implicit spi: SPI[Json]): JsonPath[A, Json] = new JsonPath[A, Json]
@@ -39,20 +51,36 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
     anotate(tokens, traversals).tail
   }
 
-  private def step(acc: Traversal[A, Json], token: PathToken): Traversal[A, Json] = token match {
-    case RecursiveField(name)           ⇒ notSupported(s"RecursiveField($name)")
-    case RootNode                       ⇒ acc
-    case AnyField                       ⇒ acc composePrism spi.jObject composeTraversal spi.jObjectValues
-    case MultiField(names)              ⇒ acc composePrism spi.jObject composeTraversal spi.filterObject(names.toSet: Set[String])
-    case Field(name)                    ⇒ acc composePrism spi.jObject composeTraversal spi.filterObject(Set(name))
-    case RecursiveAnyField              ⇒ notSupported("RecursiveAnyField")
-    case CurrentNode                    ⇒ acc
-    case FILTER_TOKEN(predicate)        ⇒ filterArrayOrObject(predicate)(acc)
-    case ArraySlice(None, None, 1)      ⇒ acc composePrism spi.jArray composeTraversal Each.each(Each.listEach)
-    case ArraySlice(begin, end, step)   ⇒ notSupported(s"ArraySlice($begin, $end, $step)")
-    case ArrayRandomAccess(indecies)    ⇒ acc composePrism spi.jArray composeTraversal FilterIndex.filterIndex(indecies.toSet: Set[Int])(FilterIndex.listFilterIndex)
-    case RecursiveFilterToken(filter)   ⇒ notSupported(s"RecursiveFilterToken($filter)")
+  def relativeAncestors(tokens: List[PathToken]): List[(String, Traversal[Json, Json])] = {
+    val traversals = tokens.map(traversal)
+
+    val stringyTokens = tokens.map(token => {
+      val str = tokenToString(token)
+      if (str.startsWith("$")) str else s"$$$str"
+    })
+
+    stringyTokens.zip(traversals)
   }
+
+  def step(acc: Traversal[A, Json], token: PathToken): Traversal[A, Json] = {
+    acc composeTraversal traversal(token)
+  }
+
+  def traversal(token: PathToken): Traversal[Json, Json] = token match {
+      case RecursiveField(name)           ⇒ notSupported(s"RecursiveField($name)")
+      case RootNode                       ⇒ idTraversal
+      case AnyField                       ⇒ spi.jObject composeTraversal spi.jObjectValues
+      case MultiField(names)              ⇒ spi.jObject composeTraversal spi.filterObject(names.toSet: Set[String])
+      case Field(name)                    ⇒ spi.jObject composeTraversal spi.filterObject(Set(name))
+      case RecursiveAnyField              ⇒ notSupported("RecursiveAnyField")
+      case CurrentNode                    ⇒ idTraversal
+      case FILTER_TOKEN(predicate)        ⇒ filterArrayOrObjects(predicate)
+      case ArraySlice(None, None, 1)      ⇒ spi.jArray composeTraversal Each.each(Each.listEach)
+      case ArraySlice(begin, end, step)   ⇒ notSupported(s"ArraySlice($begin, $end, $step)")
+      case ArrayRandomAccess(indecies)    ⇒ spi.jArray composeTraversal FilterIndex.filterIndex(indecies.toSet: Set[Int])(FilterIndex.listFilterIndex)
+      case RecursiveFilterToken(filter)   ⇒ notSupported(s"RecursiveFilterToken($filter)")
+    }
+
 
   private val FILTER_TOKEN: Extractor[FilterToken, Json => Boolean] = Extractor.pf[FilterToken, Json => Boolean] {
     case ComparisonFilter(CMP_OP(op), JFN(lhs),          JFN(rhs))          ⇒ json => op(lhs(json), rhs(json))
@@ -92,27 +120,27 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
 
   private def notSupported[X](x: X): Nothing = sys.error(s"$x not supported !")
 
-  private def filterArrayOrObject(predicate: Json => Boolean)(acc: Traversal[A, Json]): Traversal[A, Json] =
-    acc composeTraversal spi.jDescendants composePrism predicatePrism(predicate)
+  private def filterArrayOrObjects(predicate: Json => Boolean): Traversal[Json, Json] =
+    spi.jDescendants composePrism predicatePrism(predicate)
 
-  private def anotate(tokens: List[PathToken], traversals: List[Traversal[A, Json]]): List[(String, Traversal[A, Json])] =
-    tokens.map(toString).inits.map(_.mkString("")).toList.reverse.zip(traversals)
+  private def anotate[B](tokens: List[PathToken], traversals: List[B]): List[(String, B)] =
+    tokens.map(tokenToString).inits.map(_.mkString("")).toList.reverse.zip(traversals)
 
   private def predicatePrism[X](p: X => Boolean): Prism[X, X] =
     Prism[X, X](json ⇒ Some(json).filter(p))(json ⇒ json)
 
-  private def toString(token: PathToken): String = token match {
+  private def tokenToString(token: PathToken): String = token match {
     case RootNode                             ⇒ "$"
     case AnyField                             ⇒ ".*"
     case MultiField(names)                    ⇒ names.map(s => s"\'$s\'").mkString(", ")
     case Field(name)                          ⇒ s".$name"
     case CurrentNode                          ⇒ "@"
     case ComparisonFilter(op, lhs, rhs)       ⇒ s"?(${toString(lhs)} ${toString(op)} ${toString(rhs)})"
-    case HasFilter(SubQuery(subTokens))       ⇒ subTokens.map(toString).mkString("")
+    case HasFilter(SubQuery(subTokens))       ⇒ subTokens.map(tokenToString).mkString("")
     case ArraySlice(None, None, 1)            ⇒ "[*]"
     case ArrayRandomAccess(indecies)          ⇒ indecies.mkString(", ")
-    case BooleanFilter(JP.AndOperator, lhs, rhs) ⇒ s"${toString(lhs)} && ${toString(rhs)}"
-    case BooleanFilter(JP.OrOperator, lhs, rhs)  ⇒ s"${toString(lhs)} || ${toString(rhs)}"
+    case BooleanFilter(JP.AndOperator, lhs, rhs) ⇒ s"${tokenToString(lhs)} && ${tokenToString(rhs)}"
+    case BooleanFilter(JP.OrOperator, lhs, rhs)  ⇒ s"${tokenToString(lhs)} || ${tokenToString(rhs)}"
     case _                                    ⇒ ???
   }
 
@@ -130,7 +158,9 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
     case JPFalse          ⇒ "false"
     case JPLong(value)    ⇒ value.toString
     case JPString(value)  ⇒ value.map(s => s"\'$s\'").mkString(", ")
-    case SubQuery(tokens) ⇒ tokens.map(toString).mkString("")
+    case SubQuery(tokens) ⇒ tokens.map(tokenToString).mkString("")
     case _                ⇒ sys.error(fv.toString)
   }
+
+  private val idTraversal: Traversal[Json, Json] = Traversal.id[Json]
 }

@@ -1,7 +1,8 @@
 package jsondbc
 
+import argonaut.CodecJson
 import jsondbc.syntax.generic._
-import org.scalatest.FreeSpecLike
+import org.scalatest.{FreeSpecLike, Matchers}
 
 abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   import spi._
@@ -402,7 +403,7 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   }
 }
 
-abstract class JsonUtil[J: SPI] extends FreeSpecLike {
+abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
   val spi: SPI[J] = SPI[J]
 
   implicit val jOrdering: Ordering[J] = spi.ordering
@@ -418,6 +419,10 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike {
     }
   }
 
+  implicit class StringSpecSyntax(val self: String) {
+    def :=[A](a: A)(implicit C: SPI.Codec[A, J]): (String, J) = self -> C.encode(a)
+  }
+
   implicit class JsonSpecSyntax(val self: J) {
     def ->:(assoc: (String, J)): J = append(self, assoc)
     def <=>(expected: J): Unit = assertJsonEquals(self, expected)
@@ -425,6 +430,13 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike {
 
   implicit class OtherListAsserterSyntax[A](val self: List[A]) {
     def <=>(expected: List[A]): Unit = assert(self === expected)
+  }
+
+  implicit class AnySpecSyntax[A](val self: A) {
+    def shouldRoundTripTo(json: J)(implicit C: SPI.Codec[A, J]): Unit = {
+      C.encode(self) <=> json
+      C.decode(json) shouldBe Right(self)
+    }
   }
 
   protected def append(to: J, assoc: (String, J)): J
