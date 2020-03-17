@@ -1,6 +1,5 @@
 package jsondbc
 
-import argonaut.CodecJson
 import jsondbc.syntax.generic._
 import org.scalatest.{FreeSpecLike, Matchers}
 
@@ -60,7 +59,11 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   }
 
   "removeFields" in {
-    ab.removeFields("a") <=> obj("a" -> j123)
+    ab.removeFields("a") <=> obj("b" -> j456)
+  }
+
+  "retainFields" in {
+    ab.retainFields("a") <=> obj("a" -> j123)
   }
 
   "addIfMissing" in {
@@ -135,7 +138,11 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     }
 
     "removeFields" in {
-      oab.descendant("$.owner").removeFields("a") <=> obj("owner" -> obj("a" -> j123))
+      oab.descendant("$.owner").removeFields("a") <=> obj("owner" -> obj("b" -> j456))
+    }
+
+    "retainFields" in {
+      oab.descendant("$.owner").retainFields("a") <=> obj("owner" -> obj("a" -> j123))
     }
 
     "complex" in {
@@ -440,12 +447,28 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
   }
 
   protected def append(to: J, assoc: (String, J)): J
-  protected def assertJsonEquals(actual: J, expected: J): Unit
+
+  protected def assertJsonEquals(actual: J, expected: J): Unit = {
+    val diff = delta(actual, expected)
+
+    if (diff != emptyObj) {
+      fail(s"Detected the following differences:\n  ${pretty(diff)}")
+    }
+  }
+
+  protected def delta(actual: J, expected: J): J = {
+    if (actual == expected) obj() else obj(
+      "actual"   := actual,
+      "expected" := expected
+    )
+  }
+
+  protected def pretty(json: J): String
 
   def reverse(json: J): J =
     jArray.modify(_.reverse).apply(json)
 
-
+  val emptyObj = obj()
   val list = List("food", "foo", "bard", "bar")
   val json: J = jArray(list.map(jString(_)))
 
@@ -482,7 +505,7 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
 
   def reverseEntry(key: String, value: String): (String, String) = (key.reverse, value.reverse)
 
-  def print(j: J): Unit
+  final def print(j: J): Unit = println(pretty(j))
   final def print(values: List[J]): Unit = values.foreach(print)
 //  def print(values: List[Json]): Unit = values.foreach(j ⇒ println(j.spaces2))
 }

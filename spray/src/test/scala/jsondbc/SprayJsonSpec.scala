@@ -10,11 +10,8 @@ class SprayJsonSpec extends AbstractJsonSpec[JsValue] {
     case other => other
   }
 
-  protected def assertJsonEquals(actual: JsValue, expected: JsValue): Unit = {
-    assert(actual == expected)
-  }
-
   def parse(jsonText: String): JsValue = JsonParser.apply(jsonText)
   def obj(socks: (String, JsValue)*): JsValue = JsObject(socks: _*)
-  def print(j: JsValue): Unit = println(j.prettyPrint)
+
+  protected def pretty(json: JsValue): String = json.prettyPrint
 }

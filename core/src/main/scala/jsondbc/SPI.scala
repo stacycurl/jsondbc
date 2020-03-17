@@ -25,29 +25,46 @@ trait SPI[J] {
     jNull.apply(())
   }
 
-  final def removeFields(j: J, names: String*): J = mapMap(j, _.filterKeys(names.toSet))
-
-  final def renameFields(j: J, fromTos: (String, String)*): J = mapMap(j, map => {
-    fromTos.foldLeft(map) {
-      case (acc, (from, to)) => acc.get(from).fold(acc)(value => (acc - from) + ((to, value)))
-    }
+  final def removeFields(j: J, names: String*): J = mapMap(j, _.filter {
+    case (field, _) => !names.contains(field)
   })
 
-  final def addIfMissing(j: J, assocs: (String, J)*): J = mapMap(j, map => {
-    assocs.foldLeft(map) {
-      case (acc, kv@(k, _)) => acc.get(k).fold(acc + kv)(_ ⇒ acc)
-    }
+  final def retainFields(j: J, names: String*): J = mapMap(j, _.filter {
+    case (field, _) => names.contains(field)
   })
+
+  final def renameFields(j: J, fromTos: (String, String)*): J = renameFields(j, fromTos.toMap)
+
+  final def renameFields(j: J, fromTos: Map[String, String]): J = mapMap(j, map => map.map {
+    case (field, value) => fromTos.getOrElse(field, field) -> value
+  })
+
+  final def addIfMissing(j: J, assocs: (String, J)*): J = addIfMissing(j, assocs.toMap)
+
+  final def addIfMissing(j: J, assocs: Map[String, J]): J = mapMap(j, map => assocs ++ map)
+
+  final def reverse(j: J): J = Function.chain(Seq(
+    jString.modify(_.reverse)(_),
+    jArray.modify(_.reverse)(_)
+  )).apply(j)
 
   final def mapValuesWithKey(j: J, f: String => J => J): J =
     mapMap(j, _.map { case (k, v) => (k, f(k)(v)) })
 
   final def jObject(entries: (String, J)*): J =
-    jObject.apply(jObjectMap.apply(entries.toMap))
+    jObject(entries.toMap)
+
+  final def jObject(entries: Map[String, J]): J =
+    jObjectEntries.apply(entries)
+
+  final def jArray(entries: J*): J =
+    jArray.apply(entries.toList)
 
   def jField(json: J, name: String): Option[J]
 
   def ordering: Ordering[J]
+
+  def js: Prism[J, String] = jString
 
   def jNull:       Prism[J, Unit]
   def jObject:     Prism[J, JsonObject]
@@ -66,6 +83,12 @@ trait SPI[J] {
 
   def jDescendants:  Traversal[J, J]
   def jObjectValues: Traversal[JsonObject, J]
+
+  def jObjectEntries: Prism[J, Map[String, J]] =
+    jObject composeIso jObjectMap
+
+  def jStrings: Prism[J, List[String]] =
+    jArray composeIso Iso[List[J], List[String]](_.flatMap(jString.getOption))(_.map(jString.apply))
 
   def filterObject(p: String => Boolean): Traversal[JsonObject, J]
 
@@ -93,14 +116,23 @@ object SPI {
   trait Codec[A, J] {
     def encode(a: A): J
     def decode(j: J): Either[String, A]
+
+    final def xmap[B](f: A => B)(g: B => A): Codec[B, J] = Codec.XMappedCodec(this, f, g)
   }
 
   object Codec {
     def apply[A, J](implicit c: Codec[A, J]): Codec[A, J] = c
 
-    implicit def identityCodec[J]: Codec[J, J] = new Codec[J, J] {
+    implicit def identityCodec[J]: Codec[J, J] = new IdentityCodec[J]
+
+    private class IdentityCodec[J] extends Codec[J, J] {
       def encode(j: J): J = j
       def decode(j: J) = Right(j)
+    }
+
+    private case class XMappedCodec[A, B, J](from: Codec[A, J], f: A => B, g: B => A) extends Codec[B, J] {
+      def encode(b: B): J = from.encode(g(b))
+      def decode(j: J): Either[String, B] = from.decode(j).right.map(f)
     }
   }
 }

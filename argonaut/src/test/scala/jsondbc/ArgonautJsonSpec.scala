@@ -121,7 +121,7 @@ class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil {
 }
 
 trait ArgonautJsonUtil extends JsonUtil[Json] {
-  def print(j: Json): Unit = println(j.spaces2)
+  protected def pretty(json: Json): String = json.spaces2
 
   def parse(jsonText: String): Json = Parse.parseOption(jsonText).getOrElse(sys.error("not json"))
 
@@ -131,8 +131,8 @@ trait ArgonautJsonUtil extends JsonUtil[Json] {
 
   protected def append(to: Json, assoc: (String, Json)): Json = assoc ->: to
 
-  protected def assertJsonEquals(actual: Json, expected: Json): Unit =
-    anyDeltaMatcherOps(actual) <=> expected
+  override protected def delta(actual: Json, expected: Json): Json =
+    sjc.delta.argonaut.json.actualExpected.flat.delta(actual, expected)
 
   val codec: CodecJson[List[String]]           = CodecJson.derived[List[String]]
   val mapCodec: CodecJson[Map[String, String]] = CodecJson.derived[Map[String, String]]

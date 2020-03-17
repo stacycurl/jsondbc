@@ -1,9 +1,9 @@
 package jsondbc
 
-import org.json4s.JsonAST.{JNothing, JObject, JValue}
-import org.json4s.{DefaultFormats, Diff, StringInput}
-
-import Json4sSPI._
+import jsondbc.Json4sSPI._
+import org.json4s.JsonAST.{JNothing, JObject}
+import org.json4s.native.Serialization
+import org.json4s.{DefaultFormats, Diff, JValue, StringInput}
 
 class Json4SJsonSpec extends AbstractJsonSpec[JValue] {
   protected def append(to: JValue, assoc: (String, JValue)): JValue = to match {
@@ -11,7 +11,7 @@ class Json4SJsonSpec extends AbstractJsonSpec[JValue] {
     case other              => other
   }
 
-  protected def assertJsonEquals(actual: JValue, expected: JValue): Unit = {
+  override protected def assertJsonEquals(actual: JValue, expected: JValue): Unit = {
     def sortObjectEntries(unsorted: JValue): JValue = unsorted match {
       case JObject(entries) => JObject(entries.sortBy(_._1).map { case (key, value) => key -> sortObjectEntries(value) })
       case other            => other
@@ -22,7 +22,25 @@ class Json4SJsonSpec extends AbstractJsonSpec[JValue] {
 
   def parse(jsonText: String): JValue = org.json4s.native.Json(DefaultFormats).parse(StringInput(jsonText))
   def obj(socks: (String, JValue)*): JValue = JObject(socks: _*)
-  def print(j: JValue): Unit = println(j)
+
+  override protected def delta(actual: JValue, expected: JValue): JValue = {
+    val diff = Diff.diff(sortObjectEntries(actual), sortObjectEntries(expected))
+
+    obj(
+      "changed" := diff.changed,
+      "added"   := diff.added,
+      "deleted" := diff.deleted,
+    )
+
+    super.delta(actual, expected)
+  }
+
+  protected def pretty(json: JValue): String = Serialization.writePretty(json)(DefaultFormats)
+
+  private def sortObjectEntries(unsorted: JValue): JValue = unsorted match {
+    case JObject(entries) => JObject(entries.sortBy(_._1).map { case (key, value) => key -> sortObjectEntries(value) })
+    case other            => other
+  }
 }
 
 

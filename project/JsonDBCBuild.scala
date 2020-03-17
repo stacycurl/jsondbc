@@ -59,6 +59,7 @@ object JsonDBCBuild extends Build {
     settings(
       libraryDependencies <++= scalaVersion(dependencies("2.12.3" → List(
         "io.circe" %% "circe-core"        % "0.9.3",
+        "io.circe" %% "circe-generic"     % "0.9.3",
         "io.circe"  % "circe-optics_2.12" % "0.9.3",
         "io.circe" %% "circe-parser" % "0.9.3" % "test"
       )))
@@ -73,6 +74,17 @@ object JsonDBCBuild extends Build {
       libraryDependencies <++= scalaVersion(dependencies("2.12.3" → List(
         "org.json4s" %% "json4s-core"   % "3.6.0",
         "org.json4s" %% "json4s-native" % "3.6.0" % "test"
+      )))
+    )
+    dependsOn core % "compile -> compile; test -> test"
+  )
+
+  lazy val play = (project in file("play")
+    settings(commonSettings: _*)
+    //    settings(Publishing.settings: _*)
+    settings(
+      libraryDependencies <++= scalaVersion(dependencies("2.12.3" → List(
+        "com.typesafe.play" %% "play-json" % "2.8.1"
       )))
     )
     dependsOn core % "compile -> compile; test -> test"

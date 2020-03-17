@@ -14,6 +14,7 @@ case class Descendant[From, Via, To](
   def filterValuesNot(p: To => Boolean)  (implicit spi: SPI[To]): From = modify(spi.filterValuesNot(_, p))
 
   def removeFields(names: String*)(implicit spi: SPI[To]): From = modify(spi.removeFields(_, names: _*))
+  def retainFields(names: String*)(implicit spi: SPI[To]): From = modify(spi.retainFields(_, names: _*))
   def renameFields(fromTos: (String, String)*)(implicit spi: SPI[To]): From = modify(spi.renameFields(_, fromTos: _*))
   def addIfMissing(assocs: (String, To)*)(implicit spi: SPI[To]): From = modify(spi.addIfMissing(_, assocs: _*))
 
