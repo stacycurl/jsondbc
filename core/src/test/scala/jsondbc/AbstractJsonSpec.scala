@@ -1,5 +1,6 @@
 package jsondbc
 
+import jsondbc.SPI.Codec
 import jsondbc.syntax.generic._
 import org.scalatest.{FreeSpecLike, Matchers}
 
@@ -440,6 +441,8 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
   }
 
   implicit class AnySpecSyntax[A](val self: A) {
+    def <=>(expected: A)(implicit codec: Codec[A, J]): Unit = assertJsonEquals(codec.encode(self), codec.encode(expected))
+
     def shouldRoundTripTo(json: J)(implicit C: SPI.Codec[A, J]): Unit = {
       C.encode(self) <=> json
       C.decode(json) shouldBe Right(self)

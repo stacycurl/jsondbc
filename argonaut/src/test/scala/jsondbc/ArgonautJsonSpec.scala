@@ -3,61 +3,10 @@ package jsondbc
 import argonaut._
 import jsondbc.syntax.argonaut._
 import jsondbc.syntax.generic._
-import sjc.delta.argonaut.json.actualExpected.flat._
-import sjc.delta.argonaut.matchers._
-import sjc.delta.matchers.syntax.anyDeltaMatcherOps
 
 class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil {
-
-  "migrations codec" in {
-    val flat = Migration(
-      "$.foods.fruit"  -> Migration.UpperCase,
-      "$.foods.staple" -> Migration.Trim,
-      "$.foods.staple" -> Migration.Reverse,
-      "$.foods"        -> Migration.Rename("staple" -> "carbs")
-    )
-
-    flat shouldRoundTripTo Json.array(
-      obj("$.foods.fruit"  := "upper-case"),
-      obj("$.foods.staple" := "trim"),
-      obj("$.foods.staple" := "reverse"),
-      obj("$.foods"        := obj("rename" := obj("staple" := "carbs")))
-    )
-
-    val nested = Migration(
-      "$" -> Migration(
-        "$.foods" -> Migration(
-          "$.fruit"  -> Migration.UpperCase,
-          "$.staple" -> Migration(
-            "$" -> Migration.Trim,
-            "$" -> Migration.Reverse
-          ),
-          "$" -> Migration.Rename("staple" -> "carbs")
-        )
-      )
-    )
-
-    val n = Migration.nested(
-      "$.foods.fruit"  -> Migration.UpperCase,
-      "$.foods.staple" -> Migration.Trim,
-      "$.foods.staple" -> Migration.Reverse,
-      "$.foods"        -> Migration.Rename("staple" -> "carbs")
-    )
-
-    n <=> nested
-
-    nested shouldRoundTripTo Json.array(
-      obj("$" := List(
-        obj("$.foods" := List(
-          obj("$.fruit"  := "upper-case"),
-          obj("$.staple" := List(
-            obj("$" := "trim"),
-            obj("$" := "reverse")
-          )),
-          obj("$" := obj("rename" := obj("staple" := "carbs")))
-        ))
-      ))
-    )
+  "migrations codec" - {
+    val factory = Migration.Operation.factory[Json]
 
     val foods = obj(
       "foods" := obj(
@@ -73,8 +22,60 @@ class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil {
       )
     )
 
-    flat.apply(foods)   <=> migratedFoods
-    nested.apply(foods) <=> migratedFoods
+    "flat" in {
+      val flat = Migration(
+        "$.foods.fruit"  -> factory.upperCase,
+        "$.foods.staple" -> factory.trim,
+        "$.foods.staple" -> factory.reverse,
+        "$.foods"        -> factory.rename("staple" -> "carbs")
+      )
+
+      flat shouldRoundTripTo Json.array(
+        obj("$.foods.fruit"  := "upper-case"),
+        obj("$.foods.staple" := "trim"),
+        obj("$.foods.staple" := "reverse"),
+        obj("$.foods"        := obj("rename" := obj("staple" := "carbs")))
+      )
+
+      flat.apply(foods) <=> migratedFoods
+    }
+
+    "nested" in {
+      val nested = Migration(
+        "$" -> Migration(
+          "$.foods" -> Migration(
+            "$.fruit"  -> factory.upperCase,
+            "$.staple" -> Migration(
+              "$" -> factory.trim,
+              "$" -> factory.reverse
+            ),
+            "$" -> factory.rename("staple" -> "carbs")
+          )
+        )
+      )
+
+      nested shouldRoundTripTo Json.array(
+        obj("$" := List(
+          obj("$.foods" := List(
+            obj("$.fruit"  := "upper-case"),
+            obj("$.staple" := List(
+              obj("$" := "trim"),
+              obj("$" := "reverse")
+            )),
+            obj("$" := obj("rename" := obj("staple" := "carbs")))
+          ))
+        ))
+      )
+
+      nested.apply(foods) <=> migratedFoods
+
+      Migration.nested(
+        "$.foods.fruit"  -> factory.upperCase,
+        "$.foods.staple" -> factory.trim,
+        "$.foods.staple" -> factory.reverse,
+        "$.foods"        -> factory.rename("staple" -> "carbs")
+      ) <=> nested
+    }
   }
 
   "descendant_case_class" - {

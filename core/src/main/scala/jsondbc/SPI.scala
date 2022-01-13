@@ -87,8 +87,26 @@ trait SPI[J] {
   def jObjectEntries: Prism[J, Map[String, J]] =
     jObject composeIso jObjectMap
 
+  def jEntries[E](entryPrism: Prism[J, E]): Prism[J, Map[String, E]] = {
+    def mapValuesPrism[K, V, W](entryPrism: Prism[V, W]): Prism[Map[K, V], Map[K, W]] = {
+      Prism.apply[Map[K, V], Map[K, W]](
+        kv ⇒ Some(kv.collect {
+          case (k, entryPrism(w)) ⇒ k -> w
+        })
+      )(
+        kw ⇒ kw.map {
+          case (k, w) ⇒ k -> entryPrism(w)
+        }
+      )
+    }
+
+    jObjectEntries composePrism mapValuesPrism[String, J, E](entryPrism)
+  }
+
+
   def jStrings: Prism[J, List[String]] =
     jArray composeIso Iso[List[J], List[String]](_.flatMap(jString.getOption))(_.map(jString.apply))
+
 
   def filterObject(p: String => Boolean): Traversal[JsonObject, J]
 
@@ -125,9 +143,24 @@ object SPI {
 
     implicit def identityCodec[J]: Codec[J, J] = new IdentityCodec[J]
 
+    implicit def listCodec[A, J](implicit spi: SPI[J], elementCodec: Codec[A, J]): Codec[List[A], J] = {
+      new Codec[List[A], J] {
+        def encode(as: List[A]): J = spi.jArray(as.map(elementCodec.encode))
+
+        def decode(json: J): Either[String, List[A]] = {
+          val jArray = spi.jArray
+
+          json match {
+            case jArray(elements) ⇒ Right(elements.flatMap(elementCodec.decode(_).toOption))
+            case _ ⇒ Left("Could not decode to list")
+          }
+        }
+      }
+    }
+
     private class IdentityCodec[J] extends Codec[J, J] {
       def encode(j: J): J = j
-      def decode(j: J) = Right(j)
+      def decode(j: J): Right[String, J] = Right(j)
     }
 
     private case class XMappedCodec[A, B, J](from: Codec[A, J], f: A => B, g: B => A) extends Codec[B, J] {

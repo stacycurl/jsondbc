@@ -62,17 +62,27 @@ object Migration {
     }
   }
 
+  implicit class EitherSyntax[L, R](private val self: Either[L, R]) {
+    def orElse(alternative: Either[L, R]): Either[L, R] = self match {
+      case Left(_) ⇒ alternative
+      case _ ⇒ self
+    }
+  }
 
   implicit def migrationCodec[Json: SPI]: Codec[Migration[Json], Json] = {
-//    CodecJson.derived[Migration](
-//      EncodeJson[Migration] {
-//        case migrations: Migrations => Migrations.migrationsCodec.encode(migrations)
-//        case operation: Operation => Operation.operationCodec.encode(operation)
-//      },
-//      Migrations.migrationsCodec.Decoder.upcast[Migration] ||| Operation.operationCodec.Decoder.upcast[Migration]
-//    )
+    new Codec[Migration[Json], Json] {
+      def encode(migration: Migration[Json]): Json = migration match {
+        case migrations: Migrations[Json] ⇒ Migrations.migrationsCodec.encode(migrations)
+        case operation: Operation[Json] ⇒ Operation.operationCodec.encode(operation)
+      }
 
-    ???
+      def decode(json: Json): Either[String, Migration[Json]] = {
+        val decodedAsMigrations =
+          Migrations.migrationsCodec.decode(json): Either[String, Migration[Json]]
+
+        decodedAsMigrations.orElse(Operation.operationCodec.decode(json))
+      }
+    }
   }
 
   case class Migrations[Json](value: List[(Optic[Json], Migration[Json])]) extends Migration[Json] {
@@ -100,20 +110,33 @@ object Migration {
   }
 
   object Migrations {
-    implicit def migrationsCodec[Json: SPI]: Codec[Migrations[Json], Json] = {
-//      implicit val migrationCodec: CodecJson[(Optic, Migration)] = CodecJson.derived[(Optic, Migration)](
-//        EncodeJson[(Optic, Migration)] {
-//          case (Optic(path), operation) => Json.obj(path -> Migration.migrationCodec.encode(operation))
-//        },
-//        DecodeJson[(Optic, Migration)](cursor => cursor.fields match {
-//          case Some(List(path)) => cursor.get[Migration](path).map((Optic.create(path), _))
-//          case _                => DecodeResult.fail("Could not decode Migration", cursor.history)
-//        })
-//      )
-//
-//      CodecJson.derived[List[(Optic, Migration)]].xmap[Migrations](Migrations(_))(_.value)
+    implicit def migrationsCodec[Json](implicit spi: SPI[Json]): Codec[Migrations[Json], Json] = {
+      implicit val singleOpticPairCodec: Codec[(Optic[Json], Migration[Json]), Json] =
+        new Codec[(Optic[Json], Migration[Json]), Json] {
+          def encode(pair: (Optic[Json], Migration[Json])): Json = pair match {
+            case (Optic(path), migration) ⇒ {
+              SPI[Json].jObject(path -> Migration.migrationCodec.encode(migration))
+            }
+          }
 
-      ???
+          def decode(json: Json): Either[String, (Optic[Json], Migration[Json])] = {
+            val jObjectEntries: Prism[Json, Map[String, Json]] = spi.jObjectEntries
+
+            json match {
+              case jObjectEntries(entries) ⇒ entries.toList match {
+                case (path, value) :: Nil ⇒ {
+                  Migration.migrationCodec.decode(value).map(Optic.create(path) → _)
+                }
+
+                case _ ⇒ Left("Could not decode Migration")
+              }
+              case _ ⇒ Left("Could not decode Migration")
+            }
+          }
+        }
+
+      Codec.listCodec[(Optic[Json], Migration[Json]), Json]
+        .xmap[Migrations[Json]](Migrations(_))(_.value)
     }
   }
 
@@ -123,6 +146,8 @@ object Migration {
 
   object Operation {
     implicit def operationCodec[Json](implicit spi: SPI[Json]): Codec[Operation[Json], Json] = {
+      val factory = new Factory[Json]
+
       new Codec[Operation[Json], Json] {
         def encode(operation: Operation[Json]): Json = operation match {
           case _: UpperCase[Json] => spi.jString("upper-case")
@@ -140,58 +165,50 @@ object Migration {
           val jString:        Prism[Json, String]            = spi.jString
           val jObjectEntries: Prism[Json, Map[String, Json]] = spi.jObjectEntries
           val jStrings:       Prism[Json, List[String]]      = spi.jStrings
+          val jStringEntries: Prism[Json, Map[String, String]] = spi.jEntries(spi.jString)
 
           val head = Extractor.apply[Map[String, Json], (String, Json)](_.toList.headOption)
 
           val optOperation: Option[Operation[Json]] = PartialFunction.condOpt(json) {
-            case jString("upper-case")                                           => new UpperCase[Json]
-            case jString("trim")                                                 => new Trim[Json]
-            case jString("reverse")                                              => new Reverse[Json]
-            case jObjectEntries(head(("rename", jObjectEntries(entries))))       => Rename.create[Json](entries)
-            case jObjectEntries(head(("filterKeys", jStrings(fields))))          => FilterKeys[Json](fields.toSet)
-            case jObjectEntries(head(("filterKeysNot", jStrings(fields))))       => FilterKeysNot[Json](fields.toSet)
-            case jObjectEntries(head(("addIfMissing", jObjectEntries(entries)))) => AddIfMissing[Json](entries)
+            case jString("upper-case")                                           => factory.upperCase
+            case jString("trim")                                                 => factory.trim
+            case jString("reverse")                                              => factory.reverse
+            case jObjectEntries(head(("rename", jStringEntries(entries))))       => factory.rename(entries)
+            case jObjectEntries(head(("filterKeys", jStrings(fields))))          => factory.filterKeys(fields.toSet)
+            case jObjectEntries(head(("filterKeysNot", jStrings(fields))))       => factory.filterKeysNot(fields.toSet)
+            case jObjectEntries(head(("addIfMissing", jObjectEntries(entries)))) => factory.addIfMissing(entries)
           }
 
           optOperation.toRight("Unknown operation")
         }
       }
     }
+
+    def factory[Json: SPI]: Factory[Json] = new Factory[Json]
+
+    class Factory[Json: SPI] {
+      def rename(entries: (String, String)*): Operation[Json] = Rename[Json](entries.toMap)
+      def rename(entries: Map[String, String]): Operation[Json] = Rename[Json](entries)
+
+      def reverse: Operation[Json] = Reverse[Json](SPI[Json])
+
+      def trim: Operation[Json] = Trim[Json](SPI[Json])
+
+      def upperCase: Operation[Json] = UpperCase[Json](SPI[Json])
+
+      def filterKeys(fields: Set[String]): Operation[Json] = FilterKeys(fields)
+
+      def filterKeysNot(fields: Set[String]): Operation[Json] = FilterKeysNot(fields)
+
+      def addIfMissing(entries: Map[String, Json]): Operation[Json] = AddIfMissing(entries)
+    }
+
+    private case class UpperCase[Json](spi: SPI[Json]) extends Operation[Json](spi.jString.modify(_.toUpperCase))
+    private case class Trim[Json](spi: SPI[Json]) extends Operation(spi.jString.modify(_.trim))
+    private case class Reverse[Json](spi: SPI[Json]) extends Operation(spi.reverse)
+    private case class Rename[Json: SPI](renames: Map[String, String]) extends Operation[Json](SPI[Json].renameFields(_, renames))
+    private case class FilterKeysNot[Json: SPI](fields: Set[String]) extends Operation[Json](SPI[Json].filterKeysNot(_, fields))
+    private case class FilterKeys[Json: SPI](fields: Set[String]) extends Operation[Json](SPI[Json].filterKeys(_, fields))
+    private case class AddIfMissing[Json: SPI](entries: Map[String, Json]) extends Operation[Json](SPI[Json].addIfMissing(_, entries))
   }
-
-  class UpperCase[Json: SPI]                    extends Operation[Json](SPI[Json].jString.modify(_.toUpperCase))
-  class Trim[Json: SPI]                         extends Operation(SPI[Json].jString.modify(_.trim))
-  class Reverse[Json: SPI]                      extends Operation(SPI[Json].reverse)
-
-  case class Rename[Json: SPI](renames: Map[String, String]) extends Operation[Json](SPI[Json].renameFields(_, renames))
-
-  object Rename {
-    def create[Json: SPI](entries: Map[String, Json]): Rename[Json] = ???
-
-    def apply[Json: SPI](entries: (String, String)*): Rename[Json] = Rename[Json](entries.toMap)
-
-//    def decode[Json](cursor: HCursor): DecodeResult[Operation] =
-//      cursor.get[Map[String, String]]("rename").map(Rename(_))
-  }
-
-  object FilterKeysNot {
-//    def decode[Json](cursor: HCursor): DecodeResult[Operation] =
-//      cursor.get[List[String]]("rename").map(fields => FilterKeysNot(fields.toSet))
-  }
-
-  case class FilterKeysNot[Json: SPI](fields: Set[String]) extends Operation[Json](SPI[Json].filterKeysNot(_, fields))
-
-  object FilterKeys {
-//    def decode(cursor: HCursor): DecodeResult[Operation] =
-//      cursor.get[List[String]]("filterKeys").map(fields => FilterKeys(fields.toSet))
-  }
-
-  case class FilterKeys[Json: SPI](fields: Set[String]) extends Operation[Json](SPI[Json].filterKeys(_, fields))
-
-  object AddIfMissing {
-//    def decode(cursor: HCursor): DecodeResult[Operation] =
-//      cursor.get[Map[String, Json]]("addIfMissing").map(AddIfMissing(_))
-  }
-
-  case class AddIfMissing[Json: SPI](entries: Map[String, Json]) extends Operation[Json](SPI[Json].addIfMissing(_, entries))
 }
