@@ -302,27 +302,30 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
       |}
     """.stripMargin)
 
-  "workWithBooleanFilters" in {    val json = parse("""{ "conditions": [true, false, true] }""")
+  "workWithBooleanFilters" in {
+    val json = parse("""{ "conditions": [true, false, true] }""")
 
     json.descendant("$.conditions[?(@ == true)]").getAll  <=> List(jTrue, jTrue)
     json.descendant("$.conditions[?(@ == false)]").getAll <=> List(jFalse)
     json.descendant("$.conditions[?(false == @)]").getAll <=> List(jFalse)
   }
 
-  "`work with test set 3`" in {    val json = parse("""{ "points": [
-          				             { "id":"i1", "x": 4, "y":-5 },
-          				             { "id":"i2", "x":-2, "y": 2, "z":1 },
-          				             { "id":"i3", "x": 8, "y": 3 },
-          				             { "id":"i4", "x":-6, "y":-1 },
-          				             { "id":"i5", "x": 0, "y": 2, "z":1 },
-          				             { "id":"i6", "x": 1, "y": 4 }
-          				           ]
-          				         }""")
+  "`work with test set 3`" in {
+    val json = parse("""{ "points": [
+         { "id":"i1", "x": 4, "y":-5 },
+         { "id":"i2", "x":-2, "y": 2, "z":1 },
+         { "id":"i3", "x": 8, "y": 3 },
+         { "id":"i4", "x":-6, "y":-1 },
+         { "id":"i5", "x": 0, "y": 2, "z":1 },
+         { "id":"i6", "x": 1, "y": 4 }
+       ]
+     }"""
+    )
 
     json.descendant("$.points[1]").getAll <=> List(parse("""{ "id":"i2", "x":-2, "y": 2, "z":1 }"""))
-    json.descendant("$.points[4].x").getAll <=> List(jLong(0))
-    json.descendant("$.points[?(@['id']=='i4')].x").getAll <=> List(jLong(-6))
-    json.descendant("$.points[*].x").getAll <=> List(4, -2, 8, -6, 0, 1).map(jLong(_))
+    json.descendant("$.points[4].x").getAll <=> List(jInt(0))
+    json.descendant("$.points[?(@['id']=='i4')].x").getAll <=> List(jInt(-6))
+    json.descendant("$.points[*].x").getAll <=> List(4, -2, 8, -6, 0, 1).map(jInt(_))
     // Non supported syntax "$['points'][?(@['x']*@['x']+@['y']*@['y'] > 50)].id"
     json.descendant("$['points'][?(@['y'] >= 3)].id").getAll <=> List(jString("i3"), jString("i6"))
     json.descendant("$.points[?(@['z'])].id").getAll <=> List(jString("i2"), jString("i5"))
@@ -332,9 +335,9 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
   "Multi-fields accessors should be interpreted correctly" in {
     val json = parse("""{"menu":{"year":2013,"file":"open","options":[{"bold":true},{"font":"helvetica"},{"size":3}]}}""")
-    json.descendant("$.menu['file','year']").getAll <=> List(jLong(2013), jString("open"))
+    json.descendant("$.menu['file','year']").getAll <=> List(jInt(2013), jString("open"))
     json.descendant("$.menu.options['foo','bar']").getAll <=> Nil
-    json.descendant("$.menu.options[*]['bold','size']").getAll <=> List(jTrue, jLong(3))
+    json.descendant("$.menu.options[*]['bold','size']").getAll <=> List(jTrue, jInt(3))
 //    json.descendant("$..options['foo','bar']").getAll <=> Nil
 //    json.descendant("$..options[*]['bold','size']").getAll <=> List(jTrue, jLong(3))
   }
@@ -484,7 +487,7 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
   val intObj = obj("1" -> jString("one"))
 
   val fields@List(lying, name, address, age, width, preferences, potatoes, knownUnknowns, awkward) = List(
-    jTrue, jString("Eric"), acaciaRoad, jLong(3), jDouble(33.5), bananas,
+    jTrue, jString("Eric"), acaciaRoad, jInt(3), jDouble(33.5), bananas,
     jArray(Nil), obj(), intObj
   )
 

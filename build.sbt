@@ -59,8 +59,8 @@ lazy val argonaut = (project in file("argonaut")
   //    settings(Publishing.settings: _*)
   settings(
     libraryDependencies ++= scalaVersion(dependencies("2.12.3" → List(
-      "io.argonaut"                %% "argonaut"         % "6.2.2",
-      "io.argonaut"                %% "argonaut-monocle" % "6.2.2",
+      "io.argonaut"                %% "argonaut"         % "6.3.3",
+      "io.argonaut"                %% "argonaut-monocle" % "6.3.3",
       "com.github.stacycurl"       %% "delta-argonaut"   % "1.2.0"  % "test"
     ))).value
   )

@@ -98,6 +98,10 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
     }
   }
 
+  private val JPInt: Extractor[JPNumber, Int] = Extractor.pf[JPNumber, Int] {
+    case JPLong(value) if value >= Int.MinValue && value <= Int.MaxValue ⇒ value.toInt
+  }
+
   private type JFN = Json ⇒ Option[Json]
 
   private val JFN: Extractor[FilterValue, JFN] = Extractor.pf[FilterValue, JFN] {
@@ -105,6 +109,7 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
     case JPTrue                          ⇒ _ ⇒ Some(spi.jBoolean(true))
     case JPFalse                         ⇒ _ ⇒ Some(spi.jBoolean(false))
     case JPDouble(value)                 ⇒ _ ⇒ Some(spi.jDouble(value))
+    case JPInt(value)                    ⇒ _ ⇒ Some(spi.jInt(value))
     case JPLong(value)                   ⇒ _ ⇒ Some(spi.jLong(value))
     case JPString(value)                 ⇒ _ ⇒ Some(spi.jString(value))
     case JPNull                          ⇒ _ ⇒ Some(spi.jNull(()))
