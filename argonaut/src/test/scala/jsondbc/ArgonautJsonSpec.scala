@@ -1,13 +1,13 @@
 package jsondbc
 
 import argonaut._
-import jsondbc.migration.data.Migration
+import jsondbc.migration.data.{Migration, Operation}
 import jsondbc.syntax.argonaut._
 import jsondbc.syntax.generic._
 
 class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil {
   "migrations codec" - {
-    val factory = Migration.Operation.factory[Json]
+    val factory = Operation.factory[Json]
 
     val foods = obj(
       "foods" := obj(
