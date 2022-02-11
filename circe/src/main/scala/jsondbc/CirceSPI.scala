@@ -6,6 +6,7 @@ import monocle.{Iso, Prism, Traversal}
 import jsondbc.SPI.Aux
 
 
+// Investigate if later versions of circe can be used with earlier versions of circe optics (that use scalaz based monocle)
 object CirceSPI extends CirceSPI
 trait CirceSPI {
   implicit val circeSPI: Aux[Json, JsonObject, JsonNumber] = new SPI[Json] {

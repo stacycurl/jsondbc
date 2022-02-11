@@ -17,7 +17,8 @@ lazy val core = (project in file("core")
   settings(
     name := "jsondbc-core",
     libraryDependencies ++= List(
-      "io.gatling" %% "jsonpath" % "0.6.8"
+      "io.gatling"      %% "jsonpath"    % "0.6.8",
+      "org.reflections"  % "reflections" % "0.9.11",
     )
   )
 )

@@ -1,6 +1,7 @@
 package jsondbc
 
 import argonaut._
+import jsondbc.migration.data.Migration
 import jsondbc.syntax.argonaut._
 import jsondbc.syntax.generic._
 

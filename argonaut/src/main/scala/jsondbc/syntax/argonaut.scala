@@ -1,9 +1,9 @@
-package jsondbc.syntax
+package jsondbc
+package syntax
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
 
 import _root_.argonaut.{CodecJson, DecodeJson, DecodeResult, EncodeJson, Json}
-import jsondbc.ArgonautSPI
 import jsondbc.syntax.generic._
 import scalaz.\/
 

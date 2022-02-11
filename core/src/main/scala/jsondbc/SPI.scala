@@ -3,64 +3,10 @@ package jsondbc
 import monocle.{Iso, Optional, Prism, Traversal}
 
 
+// TODO: Remove dependency on monocle in core, it's probably limiting the versions of non-scalaz based json libs.
 trait SPI[J] {
   type JsonObject
   type JsonNumber
-
-  // Helpers
-  final def filterKeys(j: J, p: String => Boolean): J = mapMap(j, _.filter { case (key, _) => p(key) })
-  final def filterKeysNot(j: J, p: String => Boolean): J = mapMap(j, _.filterNot { case (key, _) => p(key) })
-  final def filterValues(j: J, p: J => Boolean): J = mapMap(j, _.filter { case (_, v) => p(v) })
-  final def filterValuesNot(j: J, p: J => Boolean): J = mapMap(j, _.filterNot { case (_, v) => p(v) })
-
-  final def filterRecursive(j: J, p: J => Boolean): J = if (p(j)) {
-    val mapMapped = mapMap(j, _.collect {
-      case (k, v) if p(v) => k -> filterRecursive(v, p)
-    })
-
-    mapList(mapMapped, _.collect {
-      case v if p(v) => filterRecursive(v, p)
-    })
-  } else {
-    jNull.apply(())
-  }
-
-  final def removeFields(j: J, names: String*): J = mapMap(j, _.filter {
-    case (field, _) => !names.contains(field)
-  })
-
-  final def retainFields(j: J, names: String*): J = mapMap(j, _.filter {
-    case (field, _) => names.contains(field)
-  })
-
-  final def renameFields(j: J, fromTos: (String, String)*): J = renameFields(j, fromTos.toMap)
-
-  final def renameFields(j: J, fromTos: Map[String, String]): J = mapMap(j, map => map.map {
-    case (field, value) => fromTos.getOrElse(field, field) -> value
-  })
-
-  final def addIfMissing(j: J, assocs: (String, J)*): J = addIfMissing(j, assocs.toMap)
-
-  final def addIfMissing(j: J, assocs: Map[String, J]): J = mapMap(j, map => assocs ++ map)
-
-  final def reverse(j: J): J = Function.chain(Seq(
-    jString.modify(_.reverse)(_),
-    jArray.modify(_.reverse)(_)
-  )).apply(j)
-
-  final def mapValuesWithKey(j: J, f: String => J => J): J =
-    mapMap(j, _.map { case (k, v) => (k, f(k)(v)) })
-
-  final def jObject(entries: (String, J)*): J =
-    jObject(entries.toMap)
-
-  final def jObject(entries: Map[String, J]): J =
-    jObjectEntries.apply(entries)
-
-  final def jArray(entries: J*): J =
-    jArray.apply(entries.toList)
-
-  def jField(json: J, name: String): Option[J]
 
   def ordering: Ordering[J]
 
@@ -83,6 +29,62 @@ trait SPI[J] {
 
   def jDescendants:  Traversal[J, J]
   def jObjectValues: Traversal[JsonObject, J]
+
+
+  // Helpers
+  def filterKeys(j: J, p: String => Boolean): J = mapMap(j, _.filter { case (key, _) => p(key) })
+  def filterKeysNot(j: J, p: String => Boolean): J = mapMap(j, _.filterNot { case (key, _) => p(key) })
+  def filterValues(j: J, p: J => Boolean): J = mapMap(j, _.filter { case (_, v) => p(v) })
+  def filterValuesNot(j: J, p: J => Boolean): J = mapMap(j, _.filterNot { case (_, v) => p(v) })
+
+  def filterRecursive(j: J, p: J => Boolean): J = if (p(j)) {
+    val mapMapped = mapMap(j, _.collect {
+      case (k, v) if p(v) => k -> filterRecursive(v, p)
+    })
+
+    mapList(mapMapped, _.collect {
+      case v if p(v) => filterRecursive(v, p)
+    })
+  } else {
+    jNull.apply(())
+  }
+
+  def removeFields(j: J, names: String*): J = mapMap(j, _.filter {
+    case (field, _) => !names.contains(field)
+  })
+
+  def retainFields(j: J, names: String*): J = mapMap(j, _.filter {
+    case (field, _) => names.contains(field)
+  })
+
+  def renameFields(j: J, fromTos: (String, String)*): J = renameFields(j, fromTos.toMap)
+
+  def renameFields(j: J, fromTos: Map[String, String]): J = mapMap(j, map => map.map {
+    case (field, value) => fromTos.getOrElse(field, field) -> value
+  })
+
+  def addIfMissing(j: J, assocs: (String, J)*): J = addIfMissing(j, assocs.toMap)
+
+  def addIfMissing(j: J, assocs: Map[String, J]): J = mapMap(j, map => assocs ++ map)
+
+  def reverse(j: J): J = Function.chain(Seq(
+    jString.modify(_.reverse)(_),
+    jArray.modify(_.reverse)(_)
+  )).apply(j)
+
+  def mapValuesWithKey(j: J, f: String => J => J): J =
+    mapMap(j, _.map { case (k, v) => (k, f(k)(v)) })
+
+  def jObject(entries: (String, J)*): J =
+    jObject(entries.toMap)
+
+  def jObject(entries: Map[String, J]): J =
+    jObjectEntries.apply(entries)
+
+  def jArray(entries: J*): J =
+    jArray.apply(entries.toList)
+
+  def jField(json: J, name: String): Option[J]
 
   def jObjectEntries: Prism[J, Map[String, J]] =
     jObject composeIso jObjectMap
@@ -110,10 +112,10 @@ trait SPI[J] {
 
   def filterObject(p: String => Boolean): Traversal[JsonObject, J]
 
-  final def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
+  def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
     Traversal.id[A] composeOptional optional(codec)
 
-  final def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
+  def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
     Optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
 
   private def mapList(j: J, f: List[J] => List[J]): J =

@@ -1,15 +1,35 @@
 package jsondbc
+package migration
+package data
 
 import jsondbc.SPI.Codec
+import jsondbc.migration.data.Migration.{Migrations, Operation, Optic}
 import jsondbc.util.Extractor
 import monocle.{Prism, Traversal}
 
+
+/**
+ * This representation of migrations that is serialisable (data vs code), this limits it's expressiveness, but increases it's uses
+ *
+ * Scenario:
+ *
+ * 1) You changed some case classes and/or codecs
+ * 2) You want to see if deploying the code will work in some environment,
+ *    i.e. will the data in that environment be decodable losslessly to the new schema
+ * 3) Therefore you need to take the data in the environment, apply any new migrations to it, and then decode/encode it
+ *    with the new code/codecs.
+ * 4) This always requires the migrations & data be co-located.
+ *
+ *  The code here assumes you migrations will move to whereever the data is.
+ *
+ *  If you can move the data to the migrations you might want to use jsondbc.migration.code instead, which is more expressive,
+ *  it doesn't have a fixed number of ways of migrating that this approach has.
+ */
 
 sealed trait Migration[Json] {
   def apply(json: Json): Json
 
   def +(rhs: Migration[Json]): Migration[Json] = {
-    import jsondbc.Migration._
 
     (this, rhs) match {
       case (l: Migrations[Json], r: Migrations[Json]) => l.add(r)

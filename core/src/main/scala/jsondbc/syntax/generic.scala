@@ -1,6 +1,6 @@
-package jsondbc.syntax
+package jsondbc
+package syntax
 
-import jsondbc.{Descendant, SPI}
 import monocle.Traversal
 
 
