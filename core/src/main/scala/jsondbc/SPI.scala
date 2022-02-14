@@ -1,5 +1,7 @@
 package jsondbc
 
+import jsondbc.syntax._
+import jsondbc.util.Extractor
 import monocle.{Iso, Optional, Prism, Traversal}
 
 
@@ -9,8 +11,6 @@ trait SPI[J] {
   type JsonNumber
 
   def ordering: Ordering[J]
-
-  def js: Prism[J, String] = jString
 
   def jNull:       Prism[J, Unit]
   def jObject:     Prism[J, JsonObject]
@@ -30,6 +30,9 @@ trait SPI[J] {
   def jDescendants:  Traversal[J, J]
   def jObjectValues: Traversal[JsonObject, J]
 
+  def jField(json: J, name: String): Option[J]
+  def filterObject(p: String => Boolean): Traversal[JsonObject, J]
+
 
   // Helpers
   def filterKeys(j: J, p: String => Boolean): J = mapMap(j, _.filter { case (key, _) => p(key) })
@@ -37,7 +40,7 @@ trait SPI[J] {
   def filterValues(j: J, p: J => Boolean): J = mapMap(j, _.filter { case (_, v) => p(v) })
   def filterValuesNot(j: J, p: J => Boolean): J = mapMap(j, _.filterNot { case (_, v) => p(v) })
 
-  def filterRecursive(j: J, p: J => Boolean): J = if (p(j)) {
+  def filterRecursive(j: J, p: J => Boolean): J = if (!p(j)) jNull.apply(()) else {
     val mapMapped = mapMap(j, _.collect {
       case (k, v) if p(v) => k -> filterRecursive(v, p)
     })
@@ -45,8 +48,6 @@ trait SPI[J] {
     mapList(mapMapped, _.collect {
       case v if p(v) => filterRecursive(v, p)
     })
-  } else {
-    jNull.apply(())
   }
 
   def removeFields(j: J, names: String*): J = mapMap(j, _.filter {
@@ -67,6 +68,10 @@ trait SPI[J] {
 
   def addIfMissing(j: J, assocs: Map[String, J]): J = mapMap(j, map => assocs ++ map)
 
+  def upsert(j: J, assocs: (String, J)*): J = upsert(j, assocs.toMap)
+
+  def upsert(j: J, assocs: Map[String, J]): J = mapMap(j, map => map ++ assocs)
+
   def reverse(j: J): J = Function.chain(Seq(
     jString.modify(_.reverse)(_),
     jArray.modify(_.reverse)(_)
@@ -75,42 +80,29 @@ trait SPI[J] {
   def mapValuesWithKey(j: J, f: String => J => J): J =
     mapMap(j, _.map { case (k, v) => (k, f(k)(v)) })
 
-  def jObject(entries: (String, J)*): J =
-    jObject(entries.toMap)
+  def obj(entries: (String, J)*): J =
+    obj(entries.toMap)
 
-  def jObject(entries: Map[String, J]): J =
+  def obj(entries: Map[String, J]): J =
     jObjectEntries.apply(entries)
 
-  def jArray(entries: J*): J =
+  def arr(entries: J*): J =
     jArray.apply(entries.toList)
 
-  def jField(json: J, name: String): Option[J]
+  def js: Prism[J, String] =
+    jString
 
   def jObjectEntries: Prism[J, Map[String, J]] =
     jObject composeIso jObjectMap
 
-  def jEntries[E](entryPrism: Prism[J, E]): Prism[J, Map[String, E]] = {
-    def mapValuesPrism[K, V, W](entryPrism: Prism[V, W]): Prism[Map[K, V], Map[K, W]] = {
-      Prism.apply[Map[K, V], Map[K, W]](
-        kv ⇒ Some(kv.collect {
-          case (k, entryPrism(w)) ⇒ k -> w
-        })
-      )(
-        kw ⇒ kw.map {
-          case (k, w) ⇒ k -> entryPrism(w)
-        }
-      )
-    }
-
-    jObjectEntries composePrism mapValuesPrism[String, J, E](entryPrism)
-  }
-
+  def jEntries[E](entryPrism: Prism[J, E]): Prism[J, Map[String, E]] =
+    jObjectEntries composePrism entryPrism.toMap[String]
 
   def jStrings: Prism[J, List[String]] =
-    jArray composeIso Iso[List[J], List[String]](_.flatMap(jString.getOption))(_.map(jString.apply))
+    jArrayEntries[String](jString)
 
-
-  def filterObject(p: String => Boolean): Traversal[JsonObject, J]
+  def jArrayEntries[E](elementPrism: Prism[J, E]): Prism[J, List[E]] =
+    jArray composePrism elementPrism.toList
 
   def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
     Traversal.id[A] composeOptional optional(codec)
@@ -118,11 +110,14 @@ trait SPI[J] {
   def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
     Optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
 
+  def reversePrism[A](codec: SPI.Codec[A, J]): Prism[J, A] =
+    Prism[J, A](j ⇒ codec.decode(j).toOption)(codec.encode(_))
+
   private def mapList(j: J, f: List[J] => List[J]): J =
     jArray.modify(f).apply(j)
 
   private def mapMap(j: J, f: Map[String, J] => Map[String, J]): J =
-    (jObject composeIso jObjectMap).modify(f).apply(j)
+    jObjectEntries.modify(f).apply(j)
 }
 
 object SPI {
@@ -141,23 +136,112 @@ object SPI {
   }
 
   object Codec {
-    def apply[A, J](implicit c: Codec[A, J]): Codec[A, J] = c
+    def apply[A, JJ](implicit c: Codec[A, JJ]): Codec[A, JJ] = c
 
-    implicit def identityCodec[J]: Codec[J, J] = new IdentityCodec[J]
-
-    implicit def listCodec[A, J](implicit spi: SPI[J], elementCodec: Codec[A, J]): Codec[List[A], J] = {
-      new Codec[List[A], J] {
-        def encode(as: List[A]): J = spi.jArray(as.map(elementCodec.encode))
-
-        def decode(json: J): Either[String, List[A]] = {
-          val jArray = spi.jArray
-
-          json match {
-            case jArray(elements) ⇒ Right(elements.flatMap(elementCodec.decode(_).toOption))
-            case _ ⇒ Left("Could not decode to list")
-          }
-        }
+    def apply[CC, A, JJ](apply: A => CC, CC: Extractor[CC, A])(
+      an: String
+    )(implicit spi: SPI[JJ], ac: Codec[A, JJ]): Codec[CC, JJ] = new Codec[CC, JJ] {
+      def encode(cc: CC): JJ = cc match {
+        case CC(a) ⇒ spi.obj(
+          an := a
+        )
       }
+
+      def decode(j: JJ): Either[String, CC] = for {
+        entries ← spi.jObjectEntries.unapply(j).toRight("Expected an object")
+        a ← entries.decode[A](an)
+      } yield apply(a)
+    }
+
+    def apply[CC, A, B, JJ](apply: (A,B) => CC, CC: Extractor[CC, (A,B)])(
+      an: String, bn: String
+    )(implicit spi: SPI[JJ], ac: Codec[A, JJ], bc: Codec[B, JJ]): Codec[CC, JJ] = new Codec[CC, JJ] {
+      def encode(cc: CC): JJ = cc match {
+        case CC(a, b) ⇒ spi.obj(
+          an := a,
+          bn := b
+        )
+      }
+
+      def decode(j: JJ): Either[String, CC] = for {
+        entries ← spi.jObjectEntries.unapply(j).toRight("Expected an object")
+        a ← entries.decode[A](an)
+        b ← entries.decode[B](bn)
+      } yield apply(a, b)
+    }
+
+    def apply[CC, A, B, C, D, E, F, G, H, I, JJ](apply: (A,B,C,D,E,F,G,H,I) => CC, CC: Extractor[CC, (A,B,C,D,E,F,G,H,I)])(
+      an: String, bn: String, cn: String, dn: String, en: String, fn: String, gn: String, hn: String, in: String
+    )(implicit spi: SPI[JJ],
+      ac: Codec[A, JJ],
+      bc: Codec[B, JJ],
+      ccodec: Codec[C, JJ],
+      dc: Codec[D, JJ],
+      ec: Codec[E, JJ],
+      fc: Codec[F, JJ],
+      gc: Codec[G, JJ],
+      hc: Codec[H, JJ],
+      ic: Codec[I, JJ]
+    ): Codec[CC, JJ] = new Codec[CC, JJ] {
+      def encode(cc: CC): JJ = cc match {
+        case CC(a, b, c, d, e, f, g, h, i) ⇒ spi.obj(
+          an := a,
+          bn := b,
+          cn := c,
+          dn := d,
+          en := e,
+          fn := f,
+          gn := g,
+          hn := h,
+          in := i
+        )
+      }
+
+      def decode(j: JJ): Either[String, CC] = for {
+        entries ← spi.jObjectEntries.unapply(j).toRight("Expected an object")
+        a ← entries.decode[A](an)
+        b ← entries.decode[B](bn)
+        c ← entries.decode[C](cn)
+        d ← entries.decode[D](dn)
+        e ← entries.decode[E](en)
+        f ← entries.decode[F](fn)
+        g ← entries.decode[G](gn)
+        h ← entries.decode[H](hn)
+        i ← entries.decode[I](in)
+      } yield apply(a, b, c, d, e, f, g, h, i)
+    }
+
+    private implicit class MapCodecSyntax[J](private val self: Map[String, J]) extends AnyVal {
+      def decode[A](an: String)(implicit codec: Codec[A, J]): Either[String, A] = for {
+        aj ← self.get(an).toRight(s"Expected object to contain $an")
+        a  ← codec.decode(aj)
+      } yield a
+    }
+
+    implicit def identityCodec[J: SPI]: Codec[J, J] = new IdentityCodec[J]
+
+    implicit def listCodec[A, J](implicit spi: SPI[J], elementCodec: Codec[A, J]): Codec[List[A], J] =
+      PrismCodec[List[A], J]("Expected a list", spi.jArray composePrism spi.reversePrism[A](elementCodec).toList)
+
+    implicit def mapCodec[V, J](implicit spi: SPI[J], k: Codec[V, J]): Codec[Map[String, V], J] =
+      PrismCodec[Map[String, V], J]("Expected a map", spi.jEntries[V](spi.reversePrism(k)))
+
+    implicit def stringCodec[J](implicit spi: SPI[J]): Codec[String, J] =
+      PrismCodec("Expected a string", spi.jString)
+
+    implicit def booleanCodec[J](implicit spi: SPI[J]): Codec[Boolean, J] =
+      PrismCodec("Expected a boolean", spi.jBoolean)
+
+    implicit def intCodec[J](implicit spi: SPI[J]): Codec[Int, J] =
+      PrismCodec("Expected an int", spi.jInt)
+
+    implicit def doubleCodec[J](implicit spi: SPI[J]): Codec[Double, J] =
+      PrismCodec("Expected a double", spi.jDouble)
+
+    private case class PrismCodec[A, J](error: String, prism: Prism[J, A]) extends Codec[A, J] {
+      def encode(a: A): J = prism(a)
+
+      def decode(j: J): Either[String, A] = prism.unapply(j).toRight(error)
     }
 
     private class IdentityCodec[J] extends Codec[J, J] {
@@ -171,3 +255,9 @@ object SPI {
     }
   }
 }
+
+//    object JString {
+//      def unapply[J](value: J)(implicit spi: SPI[J]): Option[String] =
+//        spi.jString.getOption(value)
+//    }
+//

@@ -1,12 +1,13 @@
 package jsondbc
 
 import io.gatling.jsonpath.AST._
-import io.gatling.{jsonpath => JP}
+import io.gatling.{jsonpath ⇒ JP}
 import jsondbc.util.Extractor
 import monocle.{Prism, Traversal}
 import monocle.function.{Each, FilterIndex}
-
 import scala.language.{dynamics, higherKinds, implicitConversions}
+
+import scala.annotation.tailrec
 
 
 case object JsonPath {
@@ -48,7 +49,7 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
   def ancestors(tokens: List[PathToken], start: Traversal[A, Json]): List[(String, Traversal[A, Json])] = {
     val traversals = tokens.scanLeft(start)(step)
 
-    anotate(tokens, traversals).tail
+    annotate(tokens, traversals).tail
   }
 
   def relativeAncestors(tokens: List[PathToken]): List[(String, Traversal[Json, Json])] = {
@@ -116,6 +117,7 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
     case other                           ⇒ notSupported(other)
   }
 
+  @tailrec
   private def subQuery(tokens: List[PathToken], acc: JFN): JFN = tokens match {
     case Nil                             ⇒ acc
     case Field(name)             :: tail ⇒ subQuery(tail, acc.andThen(_.flatMap(spi.jField(_, name))))
@@ -128,7 +130,7 @@ class JsonPath[A, Json](implicit spi: SPI[Json]) {
   private def filterArrayOrObjects(predicate: Json => Boolean): Traversal[Json, Json] =
     spi.jDescendants composePrism predicatePrism(predicate)
 
-  private def anotate[B](tokens: List[PathToken], traversals: List[B]): List[(String, B)] =
+  private def annotate[B](tokens: List[PathToken], traversals: List[B]): List[(String, B)] =
     tokens.map(tokenToString).inits.map(_.mkString("")).toList.reverse.zip(traversals)
 
   private def predicatePrism[X](p: X => Boolean): Prism[X, X] =

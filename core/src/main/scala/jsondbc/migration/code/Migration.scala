@@ -7,7 +7,7 @@ import scala.language.implicitConversions
 import jsondbc.Descendant.DescendantViaJsonFrills
 import jsondbc.SPI.Aux
 import jsondbc.migration.data.MigrationId
-import jsondbc.syntax.generic.AnyFrills
+import jsondbc.syntax._
 import jsondbc.util.ClassResolver
 
 import scala.reflect.ClassTag
@@ -38,7 +38,7 @@ object Migration {
  *  need to be serializable, and thus cannot contain custom code. That approach is in jsondbc.migration.data
  */
 abstract class Migration[J: SPI] {
-  def migrate(json: J): Option[J]
+  def migrate(json: J): MigrationResult[J]
 
   def id: MigrationId =
     MigrationId(getClass.getSimpleName.stripSuffix("$"))
@@ -48,6 +48,15 @@ abstract class Migration[J: SPI] {
 
   // Syntax
 
+  protected def delete: MigrationResult[J] =
+    MigrationResult.Delete
+
+  protected def update(value: J): MigrationResult[J] =
+    MigrationResult.Update(value)
+
+  protected def failed(error: String): MigrationResult[J] =
+    MigrationResult.Failed(error)
+
   protected implicit val spi: Aux[J, SPI[J]#JsonObject, SPI[J]#JsonNumber] =
     SPI[J]
 
@@ -56,5 +65,7 @@ abstract class Migration[J: SPI] {
 
   protected implicit def descendantViaJsonFrills[From, To](descendant: Descendant[From, J, To]): DescendantViaJsonFrills[From, J, To] =
     new DescendantViaJsonFrills(descendant)
-}
 
+  protected implicit def stringJsonSyntax(value: String): StringJsonSyntax =
+    new StringJsonSyntax(value)
+}

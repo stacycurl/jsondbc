@@ -1,5 +1,6 @@
 package jsondbc
 
+import jsondbc.syntax._
 import jsondbc.Json4sSPI._
 import org.json4s.JsonAST.{JNothing, JObject}
 import org.json4s.native.Serialization

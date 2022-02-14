@@ -1,29 +1,72 @@
 package jsondbc
 
 import jsondbc.SPI.Codec
-import jsondbc.syntax.generic._
+import jsondbc.migration.data.Operation
+import jsondbc.syntax._
 import org.scalatest.{FreeSpecLike, Matchers}
 
 abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
   import spi._
 
   val (j123, j456) = (jLong(123), jLong(456))
-  val ab = obj("a" -> j123, "b" -> j456)
+  val ab: J = obj("a" → j123, "b" → j456)
+
+  "descendant_case_class" - {
+    val bananaMan = Bananaman(
+      "Eric", lying = true, 3, Map("bananas" → true),
+      Address(List("29 Acacia Road", "Nuttytown")), 33.5, Map(), Nil, Map("1" → "one")
+    )
+
+    "complex" in {
+      val actual = bananaMan
+        .descendant("$.preferences.*").bool.set(false)
+        .descendant("$.address").array.string.modify("Flat B" :: _)
+        .descendant("$.address[*]").string.modify(_.toUpperCase)
+        .descendant("$.potatoes.*.variety").string.modify(_ ⇒ "Avalanche")
+        .descendant("$.knownUnknowns.*").int.modify(_ ⇒ 42)
+        .descendant("$.awkward.*").string.modify(_.toUpperCase)
+
+      actual <=> Bananaman(
+        "Eric", lying = true, 3, Map("bananas" → false),
+        Address(List("FLAT B", "29 ACACIA ROAD", "NUTTYTOWN")), 33.5, Map(), Nil, Map("1" → "ONE")
+      )
+    }
+
+    "dynamic" in {
+      val actual = bananaMan
+        .descendant.preferences.each.bool.set(false)
+        .descendant.address.array.string.modify("Flat B" :: _)
+        .descendant.address.each.string.modify(_.toUpperCase)
+        .descendant.potatoes.each.variety.string.modify(_ ⇒ "Avalanche")
+        .descendant.knownUnknowns.each.int.modify(_ ⇒ 42)
+        .descendant.awkward.each.string.modify(_.toUpperCase)
+
+      actual <=> Bananaman(
+        "Eric", lying = true, 3, Map("bananas" → false),
+        Address(List("FLAT B", "29 ACACIA ROAD", "NUTTYTOWN")), 33.5, Map(), Nil, Map("1" → "ONE")
+      )
+    }
+  }
+
+  "as" in {
+    jobj.descendant("$.address").as[Address].getAll            <=> List(Address(List("29 Acacia Road", "Nuttytown")))
+    jobj.descendant("$.address").as[Address].modify(_.reverse) <=> jobj.descendant("$.address").array.modify(_.reverse)
+  }
 
   "filterKeys" in {
-    ab.filterKeys(_ == "a") <=> obj("a" -> j123)
+    ab.filterKeys(_ == "a") <=> obj("a" → j123)
   }
 
   "filterKeysNot" in {
-    ab.filterKeysNot(_ == "a") <=> obj("b" -> j456)
+    ab.filterKeysNot(_ == "a") <=> obj("b" → j456)
   }
 
   "filterValues" in {
-    ab.filterValues(_ == j123) <=> obj("a" -> j123)
+    ab.filterValues(_ == j123) <=> obj("a" → j123)
   }
 
   "filterValuesNot" in {
-    ab.filterValuesNot(_ == j123) <=> obj("b" -> j456)
+    ab.filterValuesNot(_ == j123) <=> obj("b" → j456)
   }
 
 
@@ -31,11 +74,11 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     val jNull = spi.jNull(())
 
     List(
-      jNull                                         -> jNull,
-      obj("a" -> jNull, "b" -> j123)                -> obj("b" -> j123),
-      jArray(List(jString("a"), jNull))             -> jArray(List(jString("a"))),
-      obj("o" -> jArray(List(jString("a"), jNull))) -> obj("o" -> jArray(List(jString("a")))),
-      jArray(List(obj("a" -> jNull, "b" -> j123)))  -> jArray(List(obj("b" -> j123)))
+      jNull                                         → jNull,
+      obj("a" → jNull, "b" → j123)                → obj("b" → j123),
+      jArray(List(jString("a"), jNull))             → jArray(List(jString("a"))),
+      obj("o" → jArray(List(jString("a"), jNull))) → obj("o" → jArray(List(jString("a")))),
+      jArray(List(obj("a" → jNull, "b" → j123)))  → jArray(List(obj("b" → j123)))
     ).foreach {
       case (input, expected) => input.filterNulls <=> expected
     }
@@ -45,45 +88,45 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     val jEmpty = obj()
 
     List(
-      jEmpty                                         -> jNull(()),
-      obj("a" -> jEmpty, "b" -> j123)                -> obj("b" -> j123),
-      jArray(List(jString("a"), jEmpty))             -> jArray(List(jString("a"))),
-      obj("o" -> jArray(List(jString("a"), jEmpty))) -> obj("o" -> jArray(List(jString("a")))),
-      jArray(List(obj("a" -> jEmpty, "b" -> j123)))  -> jArray(List(obj("b" -> j123)))
+      jEmpty                                         → jNull(()),
+      obj("a" → jEmpty, "b" → j123)                → obj("b" → j123),
+      jArray(List(jString("a"), jEmpty))             → jArray(List(jString("a"))),
+      obj("o" → jArray(List(jString("a"), jEmpty))) → obj("o" → jArray(List(jString("a")))),
+      jArray(List(obj("a" → jEmpty, "b" → j123)))  → jArray(List(obj("b" → j123)))
     ).foreach {
       case (input, expected) => input.filterRecursive(_ != jEmpty) <=> expected
     }
   }
 
   "renameFields" in {
-    obj("original" → jTrue).renameFields("original" -> "renamed") <=> obj("renamed" → jTrue)
+    obj("original" → jTrue).renameFields("original" → "renamed") <=> obj("renamed" → jTrue)
   }
 
   "removeFields" in {
-    ab.removeFields("a") <=> obj("b" -> j456)
+    ab.removeFields("a") <=> obj("b" → j456)
   }
 
   "retainFields" in {
-    ab.retainFields("a") <=> obj("a" -> j123)
+    ab.retainFields("a") <=> obj("a" → j123)
   }
 
   "addIfMissing" in {
-    obj()                .addIfMissing("a" -> jAdded) <=> obj("a" -> jAdded)
-    obj("a" -> jExisting).addIfMissing("a" -> jAdded) <=> obj("a" -> jExisting)
+    obj()                .addIfMissing("a" → jAdded) <=> obj("a" → jAdded)
+    obj("a" → jExisting).addIfMissing("a" → jAdded) <=> obj("a" → jExisting)
   }
 
   "descendant" - {
-    val oab = obj("owner" -> ab)
+    val oab = obj("owner" → ab)
 
     "values" in {
       jobj.descendant("$.age").getAll <=> List(age)
-      jobj.descendant("$.age").modify(_ ⇒ redacted) <=> ("age" → redacted) ->: jobj
+      jobj.descendant("$.age").modify(_ ⇒ redacted) <=> ("age" → redacted) →: jobj
 
       jobj.descendant("$.name", "$.age").getAll <=> List(name, age)
-      jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) ->: ("age" → redacted) ->: jobj
+      jobj.descendant("$.name", "$.age").modify(_ ⇒ redacted) <=> ("name" → redacted) →: ("age" → redacted) →: jobj
 
       jobj.descendant("$.age").int.getAll <=> List(3)
-      jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jInt(6)) ->: jobj
+      jobj.descendant("$.age").int.modify(_ * 2) <=> ("age" → jInt(6)) →: jobj
     }
 
     "elements" in {
@@ -104,46 +147,46 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     }
 
     "filterKeys" in {
-      oab.descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" -> obj("a" -> j123))
+      oab.descendant("$.owner").filterKeys(_ == "a") <=> obj("owner" → obj("a" → j123))
     }
 
     "filterKeysNot" in {
-      oab.descendant("$.owner").filterKeysNot(_ == "a") <=> obj("owner" -> obj("b" -> j456))
+      oab.descendant("$.owner").filterKeysNot(_ == "a") <=> obj("owner" → obj("b" → j456))
     }
 
     "filterValues" in {
-      oab.descendant("$.owner").filterValues(_ == j123) <=> obj("owner" -> obj("a" -> j123))
+      oab.descendant("$.owner").filterValues(_ == j123) <=> obj("owner" → obj("a" → j123))
     }
 
     "filterValuesNot" in {
-      oab.descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" -> obj("b" -> j456))
+      oab.descendant("$.owner").filterValuesNot(_ == j123) <=> obj("owner" → obj("b" → j456))
     }
 
     "renameFields" in {
-      oab.descendant("$.owner").renameFields("b" -> "c")             <=> obj("owner" -> obj("a" -> j123, "c" -> j456))
-      oab.descendant("$.owner").renameFields("a" -> "x", "b" -> "y") <=> obj("owner" -> obj("x" -> j123, "y" -> j456))
+      oab.descendant("$.owner").renameFields("b" → "c")             <=> obj("owner" → obj("a" → j123, "c" → j456))
+      oab.descendant("$.owner").renameFields("a" → "x", "b" → "y") <=> obj("owner" → obj("x" → j123, "y" → j456))
     }
 
     "addIfMissing" in {
-      obj("owner" -> obj()).descendant("$.owner").addIfMissing("a" -> jAdded) <=> obj("owner" -> obj("a" -> jAdded))
+      obj("owner" → obj()).descendant("$.owner").addIfMissing("a" → jAdded) <=> obj("owner" → obj("a" → jAdded))
       obj()
-      obj("a" -> jExisting).addIfMissing("a" -> jAdded) <=> obj("a" -> jExisting)
+      obj("a" → jExisting).addIfMissing("a" → jAdded) <=> obj("a" → jExisting)
 
       on(
-        thing(obj()),         thing(obj("a" -> jExisting)),
-        thing(obj("b" -> jExisting)), thing(obj("a" -> jExisting, "b" -> jExisting))
-      ).calling(_.descendant("$.thing").addIfMissing("a" -> jAdded, "b" -> jAdded)).produces(
-        thing(obj("a" -> jAdded, "b" -> jAdded)),    thing(obj("a" -> jExisting, "b" -> jAdded)),
-        thing(obj("a" -> jAdded, "b" -> jExisting)), thing(obj("a" -> jExisting, "b" -> jExisting))
+        thing(obj()),         thing(obj("a" → jExisting)),
+        thing(obj("b" → jExisting)), thing(obj("a" → jExisting, "b" → jExisting))
+      ).calling(_.descendant("$.thing").addIfMissing("a" → jAdded, "b" → jAdded)).produces(
+        thing(obj("a" → jAdded, "b" → jAdded)),    thing(obj("a" → jExisting, "b" → jAdded)),
+        thing(obj("a" → jAdded, "b" → jExisting)), thing(obj("a" → jExisting, "b" → jExisting))
       )
     }
 
     "removeFields" in {
-      oab.descendant("$.owner").removeFields("a") <=> obj("owner" -> obj("b" -> j456))
+      oab.descendant("$.owner").removeFields("a") <=> obj("owner" → obj("b" → j456))
     }
 
     "retainFields" in {
-      oab.descendant("$.owner").retainFields("a") <=> obj("owner" -> obj("a" -> j123))
+      oab.descendant("$.owner").retainFields("a") <=> obj("owner" → obj("a" → j123))
     }
 
     "complex" in {
@@ -202,9 +245,9 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
 
     "descendant_ancestors" in {
       jobj.descendant("$.preferences.bananas").string.ancestors <=> obj(
-        "$"                     -> spi.jArray(jobj.descendant("$").getAll),
-        "$.preferences"         -> spi.jArray(jobj.descendant("$.preferences").getAll),
-        "$.preferences.bananas" -> spi.jArray(jobj.descendant("$.preferences.bananas").getAll)
+        "$"                     → spi.jArray(jobj.descendant("$").getAll),
+        "$.preferences"         → spi.jArray(jobj.descendant("$.preferences").getAll),
+        "$.preferences.bananas" → spi.jArray(jobj.descendant("$.preferences.bananas").getAll)
       )
     }
 
@@ -240,28 +283,23 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     val List(pancake, round, normal) = List("pancake", "round", "normal").map(jString(_))
 
     obj(
-      "people" -> jArray(List(
-        obj("name" -> bob, "width" -> j456, "height" -> j123),
-        obj("name" -> jim, "width" -> j123, "height" -> j123),
-        obj("name" -> sue, "width" -> j123, "height" -> j456)
+      "people" → jArray(List(
+        obj("name" → bob, "width" → j456, "height" → j123),
+        obj("name" → jim, "width" → j123, "height" → j123),
+        obj("name" → sue, "width" → j123, "height" → j456)
       ))
-    ).descendant("$.people[?(@.width > @.height)]") .addIfMissing("description" -> pancake)
-     .descendant("$.people[?(@.width == @.height)]").addIfMissing("description" -> round)
-     .descendant("$.people[?(@.width < @.height)]") .addIfMissing("description" -> normal) <=> obj(
-      "people" -> jArray(List(
-        obj("name" -> bob, "width" -> j456, "height" -> j123, "description" -> pancake),
-        obj("name" -> jim, "width" -> j123, "height" -> j123, "description" -> round),
-        obj("name" -> sue, "width" -> j123, "height" -> j456, "description" -> normal)
+    ).descendant("$.people[?(@.width > @.height)]") .addIfMissing("description" → pancake)
+     .descendant("$.people[?(@.width == @.height)]").addIfMissing("description" → round)
+     .descendant("$.people[?(@.width < @.height)]") .addIfMissing("description" → normal) <=> obj(
+      "people" → jArray(List(
+        obj("name" → bob, "width" → j456, "height" → j123, "description" → pancake),
+        obj("name" → jim, "width" → j123, "height" → j123, "description" → round),
+        obj("name" → sue, "width" → j123, "height" → j456, "description" → normal)
       ))
     )
   }
 
-
-
-
-
-
-  private val store = parse(
+  private val store: J = parse(
     """
       |{
       |    "store": {
@@ -386,7 +424,7 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     jArray(conditions.descendant("$.conditions[?(@['condition'] == true)].id").getAll)  <=> parse("""["i1"]""")
     jArray(conditions.descendant("$.conditions[?(@['condition'] == false)].id").getAll) <=> parse("""["i2"]""")
 
-    conditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" -> jTrue)) <=> parse("""{
+    conditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" → jTrue)) <=> parse("""{
       "conditions": [
         { "id": "i1", "condition": true, "matched": true },
         { "id": "i2", "condition": false }
@@ -405,13 +443,105 @@ abstract class AbstractJsonSpec[J: SPI] extends JsonUtil[J] with FreeSpecLike {
     jArray(objConditions.descendant("$.conditions[?(@['condition'] == true)].id").getAll)  <=> parse("""["i1"]""")
     jArray(objConditions.descendant("$.conditions[?(@['condition'] == false)].id").getAll) <=> parse("""["i2"]""")
 
-    objConditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" -> jTrue)) <=> parse("""{
+    objConditions.descendant("$.conditions[?(@['condition'] == true)]").modify(_.addIfMissing("matched" → jTrue)) <=> parse("""{
       "conditions": {
         "first": { "id": "i1", "condition": true, "matched": true },
         "second": { "id": "i2", "condition": false }
       }
     }""")
   }
+
+  "operations" - {
+    val operations = Operation.factory[J]
+
+    val foods = obj(
+      "foods" := obj(
+        "fruit"  := "banana",
+        "staple" := "potato ",
+        "sweet"  := "cookies",
+        "snack"  := "crisps",
+        "drink"  := "water"
+      )
+    )
+
+    val migratedFoods = obj(
+      "foods" := obj(
+        "fruit" := "BANANA",
+        "carbs" := "otatop",
+        "sweet" := "cake"
+      )
+    )
+
+    "flat" in {
+      val flat = operations(
+        "$.foods.fruit"  → operations.upperCase,
+        "$.foods.staple" → operations.trim,
+        "$.foods.staple" → operations.reverse,
+        "$.foods.sweet"  → operations.replaceWith("cake"),
+        "$.foods"        → operations.rename("staple" → "carbs"),
+        "$.foods"        → operations.removeFields("snack", "drink")
+      )
+
+      flat shouldRoundTripTo spi.arr(
+        obj("$.foods.fruit"  := "upper-case"),
+        obj("$.foods.staple" := "trim"),
+        obj("$.foods.staple" := "reverse"),
+        obj("$.foods.sweet"  := obj("replaceWith" := "cake")),
+        obj("$.foods"        := obj("rename" := obj("staple" := "carbs"))),
+        obj("$.foods"        := obj("removeFields" := List("snack", "drink")))
+      )
+
+      flat.apply(foods) <=> migratedFoods
+    }
+
+    "nested" in {
+      val nested = operations(
+        "$" → operations(
+          "$.foods" → operations(
+            "$.fruit"  → operations.upperCase,
+            "$.staple" → operations(
+              "$" → operations.trim,
+              "$" → operations.reverse
+            ),
+            "$.sweet" → operations.replaceWith("cake"),
+            "$" → operations(
+              "$" → operations.rename("staple" → "carbs"),
+              "$" → operations.removeFields("snack", "drink")
+            )
+          )
+        )
+      )
+
+      nested shouldRoundTripTo spi.arr(
+        obj("$" := List(
+          obj("$.foods" := List(
+            obj("$.fruit"  := "upper-case"),
+            obj("$.staple" := List(
+              obj("$" := "trim"),
+              obj("$" := "reverse")
+            )),
+            obj("$.sweet" := obj("replaceWith" := "cake")),
+            obj("$" := List(
+              obj("$" := obj("rename" := obj("staple" := "carbs"))),
+              obj("$" := obj("removeFields" := List("snack", "drink"))),
+            ))
+          ))
+        ))
+      )
+
+      nested.apply(foods) <=> migratedFoods
+
+      operations.nested(
+        "$.foods.fruit"  → operations.upperCase,
+        "$.foods.staple" → operations.trim,
+        "$.foods.staple" → operations.reverse,
+        "$.foods.sweet"  → operations.replaceWith("cake"),
+        "$.foods"        → operations.rename("staple" → "carbs"),
+        "$.foods"        → operations.removeFields("snack", "drink")
+      ) <=> nested
+    }
+  }
+
 }
 
 abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
@@ -430,12 +560,8 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
     }
   }
 
-  implicit class StringSpecSyntax(val self: String) {
-    def :=[A](a: A)(implicit C: SPI.Codec[A, J]): (String, J) = self -> C.encode(a)
-  }
-
   implicit class JsonSpecSyntax(val self: J) {
-    def ->:(assoc: (String, J)): J = append(self, assoc)
+    def →:(assoc: (String, J)): J = append(self, assoc)
     def <=>(expected: J): Unit = assertJsonEquals(self, expected)
   }
 
@@ -483,8 +609,8 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
 
 
   val acaciaRoad = jArray(List(jString("29 Acacia Road"), jString("Nuttytown")))
-  val bananas = obj("bananas" -> jTrue)
-  val intObj = obj("1" -> jString("one"))
+  val bananas = obj("bananas" → jTrue)
+  val intObj = obj("1" → jString("one"))
 
   val fields@List(lying, name, address, age, width, preferences, potatoes, knownUnknowns, awkward) = List(
     jTrue, jString("Eric"), acaciaRoad, jInt(3), jDouble(33.5), bananas,
@@ -516,10 +642,21 @@ abstract class JsonUtil[J: SPI] extends FreeSpecLike with Matchers {
 //  def print(values: List[Json]): Unit = values.foreach(j ⇒ println(j.spaces2))
 }
 
+object Bananaman {
+  implicit def bananamanCodec[J: SPI]: Codec[Bananaman, J] = Codec(Bananaman.apply _, Bananaman.unapply _)(
+    "name", "lying", "age", "preferences", "address", "width", "knownUnknowns", "potatoes", "awkward"
+  )
+}
+
 case class Bananaman(
   name: String, lying: Boolean, age: Int, preferences: Map[String, Boolean], address: Address,
   width: Double, knownUnknowns: Map[String, String], potatoes: List[String], awkward: Map[String, String]
 )
+
+object Address {
+  implicit def addressCodec[J: SPI]: Codec[Address, J] =
+    Codec[List[String], J].xmap[Address](Address(_))(_.lines)
+}
 
 case class Address(lines: List[String]) {
   def reverse: Address = copy(lines.reverse)

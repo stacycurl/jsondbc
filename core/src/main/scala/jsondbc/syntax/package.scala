@@ -1,11 +1,14 @@
 package jsondbc
-package syntax
 
 import monocle.Traversal
 
 
-object generic {
-  implicit class AnyFrills[A](val self: A) extends AnyVal {
+package object syntax {
+  implicit class StringJsonSyntax(private val self: String) extends AnyVal {
+    def :=[A, J](a: A)(implicit C: SPI.Codec[A, J]): (String, J) = self -> C.encode(a)
+  }
+
+  implicit class AnyFrills[A](private val self: A) extends AnyVal {
     def descendant[J](implicit C: SPI.Codec[A, J], S: SPI[J]): Descendant[A, J, J] = {
       val traversal: Traversal[A, J] = S.traversal(C)
 

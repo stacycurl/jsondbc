@@ -68,7 +68,7 @@ object Descendant {
     }
 
     def ancestors(implicit spi: SPI[J]): J =
-      spi.jObject(ancestorsList.map { case (k, v) => k -> spi.jArray(v) }: _*)
+      spi.obj(ancestorsList.map { case (k, v) => k -> spi.jArray(v) }: _*)
 
     private def ancestorsList(implicit spi: SPI[J]): List[(String, List[J])] =
       self.ancestorsFn().map { case (k, ancestor) => k -> ancestor.getAll(self.from) }
