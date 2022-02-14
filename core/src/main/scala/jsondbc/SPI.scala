@@ -153,6 +153,25 @@ object SPI {
       } yield apply(a)
     }
 
+    def apply[CC, A, B, C, JJ](apply: (A,B,C) => CC, CC: Extractor[CC, (A,B,C)])(
+      an: String, bn: String, cn: String
+    )(implicit spi: SPI[JJ], ac: Codec[A, JJ], bc: Codec[B, JJ], ccodec: Codec[C, JJ]): Codec[CC, JJ] = new Codec[CC, JJ] {
+      def encode(cc: CC): JJ = cc match {
+        case CC(a, b, c) ⇒ spi.obj(
+          an := a,
+          bn := b,
+          cn := c
+        )
+      }
+
+      def decode(j: JJ): Either[String, CC] = for {
+        entries ← spi.jObjectEntries.unapply(j).toRight("Expected an object")
+        a ← entries.decode[A](an)
+        b ← entries.decode[B](bn)
+        c ← entries.decode[C](cn)
+      } yield apply(a, b, c)
+    }
+
     def apply[CC, A, B, JJ](apply: (A,B) => CC, CC: Extractor[CC, (A,B)])(
       an: String, bn: String
     )(implicit spi: SPI[JJ], ac: Codec[A, JJ], bc: Codec[B, JJ]): Codec[CC, JJ] = new Codec[CC, JJ] {

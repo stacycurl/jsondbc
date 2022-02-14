@@ -23,13 +23,13 @@ import jsondbc.SPI.Codec
  *  it doesn't have a fixed number of ways of migrating that this approach has.
  */
 
-case class Migration[J](id: MigrationId, operation: Operation[J]) {
+case class Migration[J](id: MigrationId, enabled: Boolean, operation: Operation[J]) {
   def apply(json: J): MigrationResult[J] =
     MigrationResult.Update(operation.apply(json))
 }
 
 object Migration {
   implicit def migrationCodec[J](implicit spi: SPI[J]): Codec[Migration[J], J] =
-    Codec(Migration.apply[J] _, Migration.unapply[J] _)("id", "operation")
+    Codec(Migration.apply[J] _, Migration.unapply[J] _)("id", "enabled", "operation")
 }
 

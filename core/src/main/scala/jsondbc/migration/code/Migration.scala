@@ -37,7 +37,7 @@ object Migration {
  *  If you can't move the data to the migrations you might be able to move the migrations to the data, but then the migrations
  *  need to be serializable, and thus cannot contain custom code. That approach is in jsondbc.migration.data
  */
-abstract class Migration[J: SPI] {
+abstract class Migration[J: SPI](enabled: Boolean) {
   def migrate(json: J): MigrationResult[J]
 
   def id: MigrationId =
