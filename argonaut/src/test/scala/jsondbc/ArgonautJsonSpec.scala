@@ -5,7 +5,7 @@ import jsondbc.syntax.argonaut._
 
 class ArgonautJsonSpec extends AbstractJsonSpec[Json] with ArgonautJsonUtil
 
-trait ArgonautJsonUtil extends JsonUtil[Json] {
+trait ArgonautJsonUtil extends JsonSpec[Json] {
   protected def pretty(json: Json): String = json.spaces2
 
   def parse(jsonText: String): Json = Parse.parseOption(jsonText).getOrElse(sys.error("not json"))

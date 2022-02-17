@@ -1,6 +1,7 @@
 import monocle.Prism
 import org.reflections.Reflections
 
+import java.lang.reflect.Modifier
 import scala.collection.JavaConverters.asScalaSetConverter
 import scala.collection.immutable.List
 import scala.reflect.ClassTag
@@ -15,7 +16,10 @@ package object jsondbc {
 
   implicit class ClassSyntax[A](private val self: Class[A]) extends AnyVal {
     def implementationsIn(prefix: String): List[Class[_ <: A]] =
-      new Reflections(prefix).getSubTypesOf(self).asScala.toList
+      new Reflections(prefix).getSubTypesOf(self).asScala.toList.filterNot(_.isAbstract)
+
+    def isAbstract: Boolean =
+      Modifier.isAbstract(self.getModifiers)
   }
 
   implicit class PrismSyntax[From, To](private val self: Prism[From, To]) extends AnyVal {

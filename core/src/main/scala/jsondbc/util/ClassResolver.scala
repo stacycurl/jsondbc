@@ -17,10 +17,11 @@ object ClassResolver {
 
       val traitClass: Class[_] = implicitly[ClassTag[A]].runtimeClass
 
-      require(
-        requirement = traitClass.isAssignableFrom(clazz),
-        message = s"${clazz.getName} does not implement ${className[A]}"
-      )
+      if (!traitClass.isAssignableFrom(clazz))
+        throw new IllegalArgumentException(s"${clazz.getName} does not implement ${className[A]}")
+
+      if (clazz.isAbstract)
+        throw new IllegalArgumentException(s"${clazz.getName} is abstract")
 
       val runtimeMirror = universe.runtimeMirror(clazz.getClassLoader)
 
