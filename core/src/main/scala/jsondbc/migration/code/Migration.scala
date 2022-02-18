@@ -5,7 +5,6 @@ package code
 import scala.language.implicitConversions
 
 import jsondbc.Descendant.DescendantViaJsonFrills
-import jsondbc.SPI.Aux
 import jsondbc.migration.data.MigrationId
 import jsondbc.syntax._
 import jsondbc.util.ClassResolver
@@ -37,7 +36,7 @@ object Migration {
  *  If you can't move the data to the migrations you might be able to move the migrations to the data, but then the migrations
  *  need to be serializable, and thus cannot contain custom code. That approach is in jsondbc.migration.data
  */
-abstract class Migration[J: SPI](val enabled: Boolean) {
+abstract class Migration[J](val enabled: Boolean)(implicit protected val spi: SPI[J]) {
   def migrate(json: J): MigrationResult[J]
 
   def id: MigrationId =
@@ -56,9 +55,6 @@ abstract class Migration[J: SPI](val enabled: Boolean) {
 
   protected def failed(error: String): MigrationResult[J] =
     MigrationResult.Failed(error)
-
-  protected implicit val spi: Aux[J, SPI[J]#JsonObject, SPI[J]#JsonNumber] =
-    SPI[J]
 
   protected implicit def anyFrills[A](value: A): AnyFrills[A] =
     new AnyFrills(value)
