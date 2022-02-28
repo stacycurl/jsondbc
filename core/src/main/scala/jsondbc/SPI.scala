@@ -1,37 +1,47 @@
 package jsondbc
 
+import jsondbc.optics.{JIso, JOptional, JPrism, JTraversal}
 import jsondbc.syntax._
 import jsondbc.util.Extractor
-import monocle.{Iso, Optional, Prism, Traversal}
 
+trait Optics {
+  def idTraversal[A]: JTraversal[A, A]
+  def listTraversal[A]: JTraversal[List[A], A]
+  def filterIndexTraversal[A](p: Int => Boolean): JTraversal[List[A], A]
 
-// TODO: Remove dependency on monocle in core, it's probably limiting the versions of non-scalaz based json libs.
-trait SPI[J] {
+  def optional[S, A](getOption: S ⇒ Option[A])(set: A ⇒ S ⇒ S): JOptional[S, A]
+
+  def prism[S, A](getOption: S ⇒ Option[A])(reverseGet: A ⇒ S): JPrism[S, A]
+
+  def iso[S, A](get: S => A)(reverseGet: A => S): JIso[S, A]
+}
+
+trait SPI[J] extends Optics {
   type JsonObject
   type JsonNumber
 
   def ordering: Ordering[J]
 
-  def jNull:       Prism[J, Unit]
-  def jObject:     Prism[J, JsonObject]
-  def jArray:      Prism[J, List[J]]
-  def jBoolean:    Prism[J, Boolean]
-  def jNumber:     Prism[J, JsonNumber]
-  def jDouble:     Prism[J, Double]
-  def jString:     Prism[J, String]
-  def jBigDecimal: Prism[J, BigDecimal]
-  def jBigInt:     Prism[J, BigInt]
-  def jLong:       Prism[J, Long]
-  def jInt:        Prism[J, Int]
-  def jShort:      Prism[J, Short]
-  def jByte:       Prism[J, Byte]
-  def jObjectMap:  Iso[JsonObject, Map[String, J]]
+  def jNull:       JPrism[J, Unit]
+  def jObject:     JPrism[J, JsonObject]
+  def jArray:      JPrism[J, List[J]]
+  def jBoolean:    JPrism[J, Boolean]
+  def jNumber:     JPrism[J, JsonNumber]
+  def jDouble:     JPrism[J, Double]
+  def jString:     JPrism[J, String]
+  def jBigDecimal: JPrism[J, BigDecimal]
+  def jBigInt:     JPrism[J, BigInt]
+  def jLong:       JPrism[J, Long]
+  def jInt:        JPrism[J, Int]
+  def jShort:      JPrism[J, Short]
+  def jByte:       JPrism[J, Byte]
+  def jObjectMap:  JIso[JsonObject, Map[String, J]]
 
-  def jDescendants:  Traversal[J, J]
-  def jObjectValues: Traversal[JsonObject, J]
+  def jDescendants:  JTraversal[J, J]
+  def jObjectValues: JTraversal[JsonObject, J]
 
   def jField(json: J, name: String): Option[J]
-  def filterObject(p: String => Boolean): Traversal[JsonObject, J]
+  def filterObject(p: String => Boolean): JTraversal[JsonObject, J]
 
 
   // Helpers
@@ -89,29 +99,29 @@ trait SPI[J] {
   def arr(entries: J*): J =
     jArray.apply(entries.toList)
 
-  def js: Prism[J, String] =
+  def js: JPrism[J, String] =
     jString
 
-  def jObjectEntries: Prism[J, Map[String, J]] =
+  def jObjectEntries: JPrism[J, Map[String, J]] =
     jObject composeIso jObjectMap
 
-  def jEntries[E](entryPrism: Prism[J, E]): Prism[J, Map[String, E]] =
+  def jEntries[E](entryPrism: JPrism[J, E]): JPrism[J, Map[String, E]] =
     jObjectEntries composePrism entryPrism.toMap[String]
 
-  def jStrings: Prism[J, List[String]] =
+  def jStrings: JPrism[J, List[String]] =
     jArrayEntries[String](jString)
 
-  def jArrayEntries[E](elementPrism: Prism[J, E]): Prism[J, List[E]] =
+  def jArrayEntries[E](elementPrism: JPrism[J, E]): JPrism[J, List[E]] =
     jArray composePrism elementPrism.toList
 
-  def traversal[A](codec: SPI.Codec[A, J]): Traversal[A, J] =
-    Traversal.id[A] composeOptional optional(codec)
+  def traversal[A](codec: SPI.Codec[A, J]): JTraversal[A, J] =
+    idTraversal[A] composeOptional optional(codec)
 
-  def optional[A](codec: SPI.Codec[A, J]): Optional[A, J] =
-    Optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
+  def optional[A](codec: SPI.Codec[A, J]): JOptional[A, J] =
+    optional[A, J](a => Some(codec.encode(a)))(j => oldA => codec.decode(j).getOrElse(oldA))
 
-  def reversePrism[A](codec: SPI.Codec[A, J]): Prism[J, A] =
-    Prism[J, A](j ⇒ codec.decode(j).toOption)(codec.encode(_))
+  def reversePrism[A](codec: SPI.Codec[A, J]): JPrism[J, A] =
+    prism[J, A](j ⇒ codec.decode(j).toOption)(codec.encode(_))
 
   private def mapList(j: J, f: List[J] => List[J]): J =
     jArray.modify(f).apply(j)
@@ -257,7 +267,7 @@ object SPI {
     implicit def doubleCodec[J](implicit spi: SPI[J]): Codec[Double, J] =
       PrismCodec("Expected a double", spi.jDouble)
 
-    private case class PrismCodec[A, J](error: String, prism: Prism[J, A]) extends Codec[A, J] {
+    private case class PrismCodec[A, J](error: String, prism: JPrism[J, A]) extends Codec[A, J] {
       def encode(a: A): J = prism(a)
 
       def decode(j: J): Either[String, A] = prism.unapply(j).toRight(error)

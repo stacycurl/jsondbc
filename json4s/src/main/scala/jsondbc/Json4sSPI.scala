@@ -1,15 +1,16 @@
 package jsondbc
 
+import scala.language.higherKinds
+
+import jsondbc.optics.monocle.scalaz.{IsoAdapter, PrismAdapter, ScalazMonocleOptics, TraversalAdapter}
 import monocle.function.Each
-import monocle.{Iso, PTraversal, Prism, Traversal}
+import monocle.{PTraversal, Prism}
 import org.json4s.JsonAST._
 import scalaz.Applicative
 
-import scala.language.higherKinds
-
 object Json4sSPI extends Json4sSPI
 trait Json4sSPI {
-  implicit val json4sSPI: SPI.Aux[JValue, JObject, JDecimal] = new SPI[JValue] {
+  implicit val json4sSPI: SPI.Aux[JValue, JObject, JDecimal] = new SPI[JValue] with ScalazMonocleOptics {
     type JsonObject = JObject
     type JsonNumber = JDecimal
 
@@ -30,42 +31,46 @@ trait Json4sSPI {
       })
     }
 
-    val jNull: Prism[JValue, Unit] = prism[Unit](jsonNull = Some(()))(_ => JNull)
-    val jObject: Prism[JValue, JObject] = Prism[JValue, JObject](asJsObject)(identity)
-    val jArray: Prism[JValue, List[JValue]] = prism[List[JValue]](jsonArray = arr => Some(arr))(JArray(_))
-    val jBoolean: Prism[JValue, Boolean] = Prism[JValue, Boolean](asBoolean)(JBool(_))
-    val jNumber: Prism[JValue, JDecimal] = prism[JDecimal](jsonNumber = Some(_))(identity)
-    val jDouble: Prism[JValue, Double] = Prism[JValue, Double](asDouble)(JDouble(_))
-    val jString: Prism[JValue, String] = Prism[JValue, String](asString)(JString)
-    val jBigDecimal: Prism[JValue, BigDecimal] = prism[BigDecimal](jsonNumber = jd => Some(jd.num))(value => JDecimal(value))
-    val jBigInt: Prism[JValue, BigInt] = prism[BigInt](jsonNumber = jd => Some(jd.num.toBigInt()))(value => JDecimal(BigDecimal(value)))
-    val jLong: Prism[JValue, Long] = prism[Long](jsonLong = Some(_))(JLong(_))
-    val jInt: Prism[JValue, Int] = Prism[JValue, Int](asInt)(value => JInt(BigInt(value)))
-    val jShort: Prism[JValue, Short] = prism[Short](jsonNumber = jd => Some(jd.num.toShort))(value => JDecimal(BigDecimal(value)))
-    val jByte: Prism[JValue, Byte] = prism[Byte](jsonNumber = jd => Some(jd.num.toByte))(value => JDecimal(BigDecimal(value)))
+    val jNull: PrismAdapter[JValue, Unit] = prism[Unit](jsonNull = Some(()))(_ => JNull)
+    val jObject: PrismAdapter[JValue, JObject] = prism[JValue, JObject](asJsObject)(identity)
+    val jArray: PrismAdapter[JValue, List[JValue]] = prism[List[JValue]](jsonArray = arr => Some(arr))(JArray(_))
+    val jBoolean: PrismAdapter[JValue, Boolean] = prism[JValue, Boolean](asBoolean)(JBool(_))
+    val jNumber: PrismAdapter[JValue, JDecimal] = prism[JDecimal](jsonNumber = Some(_))(identity)
+    val jDouble: PrismAdapter[JValue, Double] = prism[JValue, Double](asDouble)(JDouble(_))
+    val jString: PrismAdapter[JValue, String] = prism[JValue, String](asString)(JString)
+    val jBigDecimal: PrismAdapter[JValue, BigDecimal] = prism[BigDecimal](jsonNumber = jd => Some(jd.num))(value => JDecimal(value))
+    val jBigInt: PrismAdapter[JValue, BigInt] = prism[BigInt](jsonNumber = jd => Some(jd.num.toBigInt()))(value => JDecimal(BigDecimal(value)))
+    val jLong: PrismAdapter[JValue, Long] = prism[Long](jsonLong = Some(_))(JLong(_))
+    val jInt: PrismAdapter[JValue, Int] = prism[JValue, Int](asInt)(value => JInt(BigInt(value)))
+    val jShort: PrismAdapter[JValue, Short] = prism[Short](jsonNumber = jd => Some(jd.num.toShort))(value => JDecimal(BigDecimal(value)))
+    val jByte: PrismAdapter[JValue, Byte] = prism[Byte](jsonNumber = jd => Some(jd.num.toByte))(value => JDecimal(BigDecimal(value)))
 
-    def jObjectMap: Iso[JObject, Map[String, JValue]] =
-      Iso[JObject, Map[String, JValue]](_.obj.toMap)(m => JObject(m.toList))
+    def jObjectMap: IsoAdapter[JObject, Map[String, JValue]] =
+      iso[JObject, Map[String, JValue]](_.obj.toMap)(m => JObject(m.toList))
 
-    val jDescendants: Traversal[JValue, JValue] = new PTraversal[JValue, JValue, JValue, JValue] {
-      override def modifyF[F[_]](f: JValue => F[JValue])(s: JValue)(implicit F: scalaz.Applicative[F]): F[JValue] =
-        jsFold(F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s),
-          arr => F.map(Each.each[List[JValue], JValue].modifyF(f)(arr))(JArray(_): JValue),
-          obj => F.map(jObjectValues.modifyF(f)(obj))(jsObject => jsObject: JValue)
-        )(s)
-    }
-
-    val jObjectValues: Traversal[JObject, JValue] = new PTraversal[JObject, JObject, JValue, JValue] {
-      def modifyF[F[_]](f: JValue => F[JValue])(o: JObject)(implicit F: Applicative[F]): F[JObject] = {
-        F.map(o.obj.foldLeft(F.point(List[(String, JValue)]())) {
-          case (acc, (k, v)) => F.apply2(acc, f(v)) {
-            case (elems, newV) => (k, newV) :: elems
-          }
-        })(elems => JObject(elems.reverse: _*))
+    val jDescendants: TraversalAdapter[JValue, JValue] = TraversalAdapter {
+      new PTraversal[JValue, JValue, JValue, JValue] {
+        override def modifyF[F[_]](f: JValue => F[JValue])(s: JValue)(implicit F: scalaz.Applicative[F]): F[JValue] =
+          jsFold(F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s),
+            arr => F.map(Each.each[List[JValue], JValue].modifyF(f)(arr))(JArray(_): JValue),
+            obj => F.map(jObjectValues.adapted.modifyF(f)(obj))(jsObject => jsObject: JValue)
+          )(s)
       }
     }
 
-    def filterObject(p: String => Boolean): Traversal[JObject, JValue] = {
+    val jObjectValues: TraversalAdapter[JObject, JValue] = TraversalAdapter {
+      new PTraversal[JObject, JObject, JValue, JValue] {
+        def modifyF[F[_]](f: JValue => F[JValue])(o: JObject)(implicit F: Applicative[F]): F[JObject] = {
+          F.map(o.obj.foldLeft(F.point(List[(String, JValue)]())) {
+            case (acc, (k, v)) => F.apply2(acc, f(v)) {
+              case (elems, newV) => (k, newV) :: elems
+            }
+          })(elems => JObject(elems.reverse: _*))
+        }
+      }
+    }
+
+    def filterObject(p: String => Boolean): TraversalAdapter[JObject, JValue] = TraversalAdapter {
       new PTraversal[JObject, JObject, JValue, JValue] {
         import scalaz.std.list._
         import scalaz.syntax.applicative._
@@ -81,7 +86,6 @@ trait Json4sSPI {
           })
       }
     }
-
 
     private def asBoolean:  JValue => Option[Boolean]  = opt(jsonBool   = Some(_))
     private def asString:   JValue => Option[String]   = opt(jsonString = Some(_))
@@ -116,9 +120,9 @@ trait Json4sSPI {
       jsonString: String       => Option[A] = (_: String) => None,
       jsonArray:  List[JValue] => Option[A] = (_: List[JValue]) => None,
       jsonObject: JObject      => Option[A] = (_: JObject) => None
-    )(jsonValue: A => JValue): Prism[JValue, A] = Prism[JValue, A](
+    )(jsonValue: A => JValue): PrismAdapter[JValue, A] = PrismAdapter(Prism[JValue, A](
       jsFold(jsonNull, jsonBool, jsonNumber, jsonDouble, jsonInt, jsonLong, jsonString, jsonArray, jsonObject)
-    )(jsonValue)
+    )(jsonValue))
 
     private def jsFold[A](
       jsonNull:                => A,

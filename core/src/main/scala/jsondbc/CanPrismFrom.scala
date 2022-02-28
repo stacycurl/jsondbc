@@ -1,9 +1,9 @@
 package jsondbc
 
-import monocle.Prism
+import jsondbc.optics.JPrism
 
 
-case class CanPrismFrom[From, Elem, To](prism: Prism[From, To]) {
+case class CanPrismFrom[From, Elem, To](prism: JPrism[From, To]) {
   def toList: CanPrismFrom[List[From], Elem, List[To]] =
     CanPrismFrom(prism.toList)
 
@@ -31,6 +31,6 @@ object CanPrismFrom {
     implicit cpf: CanPrismFrom[From, Elem, To]
   ): CanPrismFrom[Map[String, From], Elem, Map[String, To]] = cpf.toMap
 
-  implicit def cpfToCodec[A, J](implicit codec: SPI.Codec[A, J]): CanPrismFrom[J, A, A] =
-    CanPrismFrom(Prism[J, A](json => codec.decode(json).toOption)(codec.encode))
+  implicit def cpfToCodec[A, J](implicit spi: SPI[J], codec: SPI.Codec[A, J]): CanPrismFrom[J, A, A] =
+    CanPrismFrom(spi.prism[J, A](json => codec.decode(json).toOption)(codec.encode))
 }

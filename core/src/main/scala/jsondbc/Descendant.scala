@@ -1,12 +1,13 @@
 package jsondbc
 
 import scala.language.{dynamics, higherKinds, implicitConversions}
-import monocle.{Iso, Optional, Prism, Traversal}
+
+import jsondbc.optics.{JIso, JOptional, JPrism, JTraversal}
 
 
 
 case class Descendant[From, Via, To](
-  from: From, traversals: List[Traversal[From, To]], ancestorsFn: () => List[(String, Traversal[From, Via])]
+  from: From, traversals: List[JTraversal[From, To]], ancestorsFn: () => List[(String, JTraversal[From, Via])]
 ) extends Dynamic {
   def filterKeys(p: String => Boolean)   (implicit spi: SPI[To]): From = modify(spi.filterKeys(_, p))
   def filterKeysNot(p: String => Boolean)(implicit spi: SPI[To]): From = modify(spi.filterKeysNot(_, p))
@@ -40,10 +41,10 @@ case class Descendant[From, Via, To](
 
   private def apply[Elem, That](cpf: CanPrismFrom[To, Elem, That]): Descendant[From, Via, That] = composePrism(cpf.prism)
 
-  def composePrism[That](next: Prism[To, That]):         Descendant[From, Via, That] = withTraversal(_ composePrism next)
-  def composeTraversal[That](next: Traversal[To, That]): Descendant[From, Via, That] = withTraversal(_ composeTraversal next)
-  def composeOptional[That](next: Optional[To, That]):   Descendant[From, Via, That] = withTraversal(_ composeOptional next)
-  def composeIso[That](next: Iso[To, That]):             Descendant[From, Via, That] = withTraversal(_ composeIso next)
+  def composePrism[That](next: JPrism[To, That]):         Descendant[From, Via, That] = withTraversal(_ composePrism next)
+  def composeTraversal[That](next: JTraversal[To, That]): Descendant[From, Via, That] = withTraversal(_ composeTraversal next)
+  def composeOptional[That](next: JOptional[To, That]):   Descendant[From, Via, That] = withTraversal(_ composeOptional next)
+  def composeIso[That](next: JIso[To, That]):             Descendant[From, Via, That] = withTraversal(_ composeIso next)
 
   def headOrElse(alternative: => To): To = headOption.getOrElse(alternative)
   def headOption: Option[To] = traversals.flatMap(_.headOption(from)).headOption
@@ -53,11 +54,11 @@ case class Descendant[From, Via, To](
   def set(to: To):         From = foldLeft(_.set(to))
   def modify(f: To => To): From = foldLeft(_.modify(f))
 
-  private def foldLeft(f: Traversal[From, To] => From => From): From = traversals.foldLeft(from) {
+  private def foldLeft(f: JTraversal[From, To] => From => From): From = traversals.foldLeft(from) {
     case (acc, traversal) => f(traversal)(acc)
   }
 
-  private def withTraversal[That](fn: Traversal[From, To] => Traversal[From, That]): Descendant[From, Via, That] =
+  private def withTraversal[That](fn: JTraversal[From, To] => JTraversal[From, That]): Descendant[From, Via, That] =
     copy(traversals = traversals.map(fn))
 }
 

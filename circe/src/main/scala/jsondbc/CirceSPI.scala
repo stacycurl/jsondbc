@@ -2,14 +2,17 @@ package jsondbc
 
 import io.circe.optics.{JsonObjectOptics, JsonOptics}
 import io.circe.{Json, JsonNumber, JsonObject}
-import monocle.{Iso, Prism, Traversal}
 import jsondbc.SPI.Aux
+import jsondbc.optics.monocle.cats.{CatsMonocleOptics, IsoAdapter, PrismAdapter, TraversalAdapter}
+import monocle.function.{Each, FilterIndex}
+import monocle.{Iso, Traversal}
 
 
 // Investigate if later versions of circe can be used with earlier versions of circe optics (that use scalaz based monocle)
 object CirceSPI extends CirceSPI
+
 trait CirceSPI {
-  implicit val circeSPI: Aux[Json, JsonObject, JsonNumber] = new SPI[Json] {
+  implicit val circeSPI: Aux[Json, JsonObject, JsonNumber] = new SPI[Json] with CatsMonocleOptics {
     type JsonObject = io.circe.JsonObject
     type JsonNumber = io.circe.JsonNumber
 
@@ -24,26 +27,36 @@ trait CirceSPI {
       })
     }
 
-    val jNull:       Prism[Json, Unit]       = JsonOptics.jsonNull
-    val jObject:     Prism[Json, JsonObject] = JsonOptics.jsonObject
-    val jArray:      Prism[Json, List[Json]] = JsonOptics.jsonArray composeIso Iso[Vector[Json], List[Json]](_.toList)(_.toVector)
-    val jBoolean:    Prism[Json, Boolean]    = JsonOptics.jsonBoolean
-    val jNumber:     Prism[Json, JsonNumber] = JsonOptics.jsonNumber
-    val jDouble:     Prism[Json, Double]     = JsonOptics.jsonDouble
-    val jString:     Prism[Json, String]     = JsonOptics.jsonString
-    val jBigDecimal: Prism[Json, BigDecimal] = JsonOptics.jsonBigDecimal
-    val jBigInt:     Prism[Json, BigInt]     = JsonOptics.jsonBigInt
-    val jLong:       Prism[Json, Long]       = JsonOptics.jsonLong
-    val jInt:        Prism[Json, Int]        = JsonOptics.jsonInt
-    val jShort:      Prism[Json, Short]      = JsonOptics.jsonShort
-    val jByte:       Prism[Json, Byte]       = JsonOptics.jsonByte
+    val jNull:       PrismAdapter[Json, Unit]       = PrismAdapter(JsonOptics.jsonNull)
+    val jObject:     PrismAdapter[Json, JsonObject] = PrismAdapter(JsonOptics.jsonObject)
+    val jArray:      PrismAdapter[Json, List[Json]] = PrismAdapter(JsonOptics.jsonArray composeIso Iso[Vector[Json], List[Json]](_.toList)(_.toVector))
+    val jBoolean:    PrismAdapter[Json, Boolean]    = PrismAdapter(JsonOptics.jsonBoolean)
+    val jNumber:     PrismAdapter[Json, JsonNumber] = PrismAdapter(JsonOptics.jsonNumber)
+    val jDouble:     PrismAdapter[Json, Double]     = PrismAdapter(JsonOptics.jsonDouble)
+    val jString:     PrismAdapter[Json, String]     = PrismAdapter(JsonOptics.jsonString)
+    val jBigDecimal: PrismAdapter[Json, BigDecimal] = PrismAdapter(JsonOptics.jsonBigDecimal)
+    val jBigInt:     PrismAdapter[Json, BigInt]     = PrismAdapter(JsonOptics.jsonBigInt)
+    val jLong:       PrismAdapter[Json, Long]       = PrismAdapter(JsonOptics.jsonLong)
+    val jInt:        PrismAdapter[Json, Int]        = PrismAdapter(JsonOptics.jsonInt)
+    val jShort:      PrismAdapter[Json, Short]      = PrismAdapter(JsonOptics.jsonShort)
+    val jByte:       PrismAdapter[Json, Byte]       = PrismAdapter(JsonOptics.jsonByte)
 
-    val jObjectMap:  Iso[JsonObject, Map[String, Json]] =
-      Iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromMap)
+    val jObjectMap:  IsoAdapter[JsonObject, Map[String, Json]] =
+      iso[JsonObject, Map[String, Json]](_.toMap)(JsonObject.fromMap)
 
-    val jDescendants:  Traversal[Json, Json]       = JsonOptics.jsonDescendants
-    val jObjectValues: Traversal[JsonObject, Json] = JsonObjectOptics.jsonObjectEach.each
+    val jDescendants:  TraversalAdapter[Json, Json]       = TraversalAdapter(JsonOptics.jsonDescendants)
+    val jObjectValues: TraversalAdapter[JsonObject, Json] = TraversalAdapter(JsonObjectOptics.jsonObjectEach.each)
 
-    def filterObject(p: String => Boolean): Traversal[JsonObject, Json] = JsonObjectOptics.jsonObjectFilterIndex.filterIndex(p)
+    def filterObject(p: String => Boolean): TraversalAdapter[JsonObject, Json] =
+      TraversalAdapter(JsonObjectOptics.jsonObjectFilterIndex.filterIndex(p))
+
+    def idTraversal[A]: TraversalAdapter[A, A] =
+      TraversalAdapter(Traversal.id[A])
+
+    def listTraversal[A]: TraversalAdapter[List[A], A] =
+      TraversalAdapter(Each.each(Each.listEach))
+
+    def filterIndexTraversal[A](p: Int ⇒ Boolean): TraversalAdapter[List[A], A] =
+      TraversalAdapter(FilterIndex.filterIndex(p)(FilterIndex.listFilterIndex))
   }
 }

@@ -3,10 +3,27 @@ import sbt.Keys.{name, _}
 import sbt.{Def, _}
 
 object JsonDBC {
-  def dependantProject(core: Project, projectName: String)(project: Project): Project = (project in file(projectName)
-    dependsOn core % "compile -> compile; test -> test"
-    settings(commonSettings: _*)
-    settings(name := s"jsondbc-$projectName")
+  def dependantProject(projectName: String, core: Project, optics: Project)(project: Project): Project = {
+    (project in file(projectName)
+      dependsOn core % "compile -> compile; test -> test"
+      dependsOn optics % "compile -> compile; test -> test"
+      settings(commonSettings: _*)
+      settings(name := s"jsondbc-$projectName")
+    )
+  }
+
+  def dependantProject(projectName: String, core: Project)(project: Project): Project = {
+    (project in file(projectName)
+      dependsOn core % "compile -> compile; test -> test"
+      settings(commonSettings: _*)
+      settings(name := s"jsondbc-$projectName")
+    )
+  }
+
+  lazy val noPublish: Seq[Def.Setting[_]] = Seq(
+    publish := {},
+    publishLocal := {},
+    publishArtifact := false
   )
 
   lazy val commonSettings: Seq[Def.Setting[_]] = Seq(
@@ -27,9 +44,6 @@ object JsonDBC {
     libraryDependencies ++= List(
       "org.scala-lang"             % "scala-compiler"    % "2.12.3" exclude("org.scala-lang.modules", "scala-xml_2.12"),
       "org.scala-lang"             % "scala-library"     % "2.12.3"    % "test",
-      "com.github.julien-truffaut" %% "monocle-core"     % "1.5.0",
-      "org.scalaz"                 %% "scalaz-core"      % "7.3.0-M6",
-
       "com.novocode"               % "junit-interface"   % "0.11"      % "test",
       "com.github.stacycurl"       %% "delta-matchers"   % "1.2.0"     % "test",
       "co.fs2"                     %% "fs2-core"         % "0.10.2"    % "test"

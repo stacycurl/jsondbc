@@ -1,6 +1,6 @@
 package jsondbc
 
-import monocle.Traversal
+import jsondbc.optics.JTraversal
 
 
 package object syntax {
@@ -10,13 +10,13 @@ package object syntax {
 
   implicit class AnyFrills[A](private val self: A) extends AnyVal {
     def descendant[J](implicit C: SPI.Codec[A, J], S: SPI[J]): Descendant[A, J, J] = {
-      val traversal: Traversal[A, J] = S.traversal(C)
+      val traversal: JTraversal[A, J] = S.traversal(C)
 
       Descendant(self, List(traversal), () => List("" -> traversal))
     }
 
     def descendant[J](paths: String*)(implicit C: SPI.Codec[A, J], S: SPI[J]): Descendant[A, J, J] = {
-      val traversal: Traversal[A, J] = S.traversal(C)
+      val traversal: JTraversal[A, J] = S.traversal(C)
 
       Descendant(self,
               paths.map(    jsondbc.JsonPath.traversal[A, J](traversal, _))(collection.breakOut),

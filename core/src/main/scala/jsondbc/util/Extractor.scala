@@ -3,7 +3,7 @@ package util
 
 import scala.language.implicitConversions
 
-import monocle.Prism
+import jsondbc.optics.JPrism
 
 import scala.util.Try
 
@@ -18,8 +18,8 @@ object Extractor {
   implicit def apply[A, B](f: A => Option[B]): Extractor[A, B] = Fn(f)
 
   def pf[A, B](pf: PartialFunction[A, B]): Extractor[A, B] = (a: A) => pf.lift(a)
-  
-  def prism[A, B](prism: Prism[A, B]): Extractor[A, B] = (a: A) ⇒ prism.getOption(a)
+
+  def prism[A, B](prism: JPrism[A, B]): Extractor[A, B] = (a: A) ⇒ prism.getOption(a)
 
   private case class Fn[A, B](f: A => Option[B]) extends Extractor[A, B] {
     def unapply(a: A): Option[B] = f(a)

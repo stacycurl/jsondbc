@@ -1,4 +1,4 @@
-import monocle.Prism
+import jsondbc.optics.JPrism
 import org.reflections.Reflections
 
 import java.lang.reflect.Modifier
@@ -22,20 +22,20 @@ package object jsondbc {
       Modifier.isAbstract(self.getModifiers)
   }
 
-  implicit class PrismSyntax[From, To](private val self: Prism[From, To]) extends AnyVal {
-    def toList: Prism[List[From], List[To]] =
-      Prism[List[From], List[To]](la ⇒ Some(la.flatMap(self.getOption)))(_.map(self.reverseGet))
+  implicit class PrismSyntax[S, A](private val self: JPrism[S, A]) extends AnyVal {
+//    def toList: Prism[List[From], List[To]] =
+//      Prism[List[From], List[To]](la ⇒ Some(la.flatMap(self.getOption)))(_.map(self.reverseGet))
 
-    def toMap[K]: Prism[Map[K, From], Map[K, To]] = Prism[Map[K, From], Map[K, To]](mapKA ⇒ {
-      Some(for {
-        (k, v) <- mapKA
-        to    <- self.getOption(v)
-      } yield k -> to)
-    })((mapKB: Map[K, To]) ⇒ {
-      mapKB.map {
-        case (k, v) => k -> self.reverseGet(v)
-      }
-    })
+//    def toMap[K]: Prism[Map[K, S], Map[K, A]] = Prism[Map[K, S], Map[K, A]](mapKA ⇒ {
+//      Some(for {
+//        (k, v) <- mapKA
+//        to    <- self.getOption(v)
+//      } yield k -> to)
+//    })((mapKB: Map[K, A]) ⇒ {
+//      mapKB.map {
+//        case (k, v) => k -> self.reverseGet(v)
+//      }
+//    })
   }
 
   def className[A: ClassTag]: String =

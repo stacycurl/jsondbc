@@ -4,9 +4,9 @@ package data
 
 import jsondbc.SPI.Codec
 import jsondbc.migration.data.Operation.Operations
+import jsondbc.optics.JPrism
 import jsondbc.syntax.StringJsonSyntax
 import jsondbc.util.Extractor
-import monocle.Prism
 
 
 object Operation {
@@ -31,10 +31,10 @@ object Operation {
       }
 
       def decode(json: J): Either[String, Operation[J]] = {
-        val jString:        Prism[J, String]            = spi.jString
-        val jObjectEntries: Prism[J, Map[String, J]] = spi.jObjectEntries
-        val jStrings:       Prism[J, List[String]]      = spi.jStrings
-        val jStringEntries: Prism[J, Map[String, String]] = spi.jEntries(spi.jString)
+        val jString:        JPrism[J, String]            = spi.jString
+        val jObjectEntries: JPrism[J, Map[String, J]] = spi.jObjectEntries
+        val jStrings:       JPrism[J, List[String]]      = spi.jStrings
+        val jStringEntries: JPrism[J, Map[String, String]] = spi.jEntries(spi.jString)
 
         val head = Extractor.apply[Map[String, J], (String, J)](_.toList.headOption)
 
@@ -112,11 +112,12 @@ object Operation {
   case class Operations[J](value: List[(Optic[J], Operation[J])]) extends Operation[J](json ⇒ value.foldLeft(json) {
     case (acc, (optic, operation)) ⇒ optic.apply(acc, operation)
   }) {
-    def add(rhs: Operations[J]): Operations[J] = if (value.isEmpty) rhs else rhs.value.foldLeft(this) {
+
+    def add(rhs: Operations[J])(implicit spi: SPI[J]): Operations[J] = if (value.isEmpty) rhs else rhs.value.foldLeft(this) {
       case (acc, (optic, operation)) ⇒ acc.add(optic, operation)
     }
 
-    def add(optic: Optic[J], operation: Operation[J]): Operations[J] = {
+    def add(optic: Optic[J], operation: Operation[J])(implicit spi: SPI[J]): Operations[J] = {
       var added: Boolean = false
 
       val modifiedValue: List[(Optic[J], Operation[J])] = value.map {
@@ -149,7 +150,7 @@ object Operation {
           }
 
           def decode(json: J): Either[String, (Optic[J], Operation[J])] = {
-            val jObjectEntries: Prism[J, Map[String, J]] = spi.jObjectEntries
+            val jObjectEntries: JPrism[J, Map[String, J]] = spi.jObjectEntries
 
             json match {
               case jObjectEntries(entries) ⇒ entries.toList match {
@@ -184,7 +185,7 @@ object Operation {
 sealed abstract class Operation[J](migrate: J ⇒ J) {
   def apply(json: J): J = migrate(json)
 
-  final def +(rhs: Operation[J]): Operation[J] = (this, rhs) match {
+  final def +(rhs: Operation[J])(implicit spi: SPI[J]): Operation[J] = (this, rhs) match {
     case (l: Operations[J], r: Operations[J]) ⇒ l.add(r)
     case (l: Operations[J], r: Operation[J])  ⇒ l.add(Optic.empty, r)
     case (l: Operation[J],  r: Operations[J]) ⇒ Operations(List(Optic.empty[J] -> l)).add(r)

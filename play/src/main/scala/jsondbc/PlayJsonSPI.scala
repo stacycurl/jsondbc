@@ -1,12 +1,15 @@
 package jsondbc
 
-import monocle.function.Each
-import monocle.{Iso, PTraversal, Prism, Traversal}
-import play.api.libs.json._
-import scalaz.Applicative
 import scala.language.higherKinds
 
+import jsondbc.optics.monocle.scalaz.{IsoAdapter, OptionalAdapter, PrismAdapter, TraversalAdapter}
+import monocle.function.{Each, FilterIndex}
+import monocle.{Iso, Optional, PTraversal, Prism, Traversal}
+import play.api.libs.json._
+import scalaz.Applicative
+
 object PlayJsonSPI extends PlayJsonSPI
+
 trait PlayJsonSPI {
   implicit val spraySPI: SPI[JsValue] = new SPI[JsValue] {
     type JsonObject = JsObject
@@ -25,32 +28,32 @@ trait PlayJsonSPI {
       })
     }
 
-    val jNull: Prism[JsValue, Unit] = prism[Unit](jsonNull = Some(()))(_ => JsNull)
-    val jObject: Prism[JsValue, JsObject] = Prism[JsValue, JsObject](asJsObject)(identity)
-    val jArray: Prism[JsValue, List[JsValue]] = prism[List[JsValue]](jsonArray = arr => Some(arr.value.toList))(JsArray(_))
-    val jBoolean: Prism[JsValue, Boolean] = Prism[JsValue, Boolean](asBoolean)(JsBoolean(_))
-    val jNumber: Prism[JsValue, JsNumber] = prism[JsNumber](jsonNumber = Some(_))(identity)
-    val jDouble: Prism[JsValue, Double] = Prism[JsValue, Double](asDouble)(JsNumber(_))
-    val jString: Prism[JsValue, String] = Prism[JsValue, String](asString)(JsString)
-    val jBigDecimal: Prism[JsValue, BigDecimal] = prism[BigDecimal](jsonNumber = num => Some(num.value))(JsNumber)
-    val jBigInt: Prism[JsValue, BigInt] = prism[BigInt](jsonNumber = num => Some(num.value.toBigInt()))(bigInt => JsNumber(BigDecimal(bigInt)))
-    val jLong: Prism[JsValue, Long] = prism[Long](jsonNumber = num => Some(num.value.toLong))(JsNumber(_))
-    val jInt: Prism[JsValue, Int] = Prism[JsValue, Int](asInt)(JsNumber(_))
-    val jShort: Prism[JsValue, Short] = prism[Short](jsonNumber = num => Some(num.value.toShort))(short => JsNumber(BigDecimal(short)))
-    val jByte: Prism[JsValue, Byte] = prism[Byte](jsonNumber = num => Some(num.value.toByte))(byte => JsNumber(BigDecimal(byte)))
+    val jNull: PrismAdapter[JsValue, Unit] = prism[Unit](jsonNull = Some(()))(_ => JsNull)
+    val jObject: PrismAdapter[JsValue, JsObject] = prism[JsValue, JsObject](asJsObject)(identity)
+    val jArray: PrismAdapter[JsValue, List[JsValue]] = prism[List[JsValue]](jsonArray = arr => Some(arr.value.toList))(JsArray(_))
+    val jBoolean: PrismAdapter[JsValue, Boolean] = prism[JsValue, Boolean](asBoolean)(JsBoolean(_))
+    val jNumber: PrismAdapter[JsValue, JsNumber] = prism[JsNumber](jsonNumber = Some(_))(identity)
+    val jDouble: PrismAdapter[JsValue, Double] = prism[JsValue, Double](asDouble)(JsNumber(_))
+    val jString: PrismAdapter[JsValue, String] = prism[JsValue, String](asString)(JsString)
+    val jBigDecimal: PrismAdapter[JsValue, BigDecimal] = prism[BigDecimal](jsonNumber = num => Some(num.value))(JsNumber)
+    val jBigInt: PrismAdapter[JsValue, BigInt] = prism[BigInt](jsonNumber = num => Some(num.value.toBigInt()))(bigInt => JsNumber(BigDecimal(bigInt)))
+    val jLong: PrismAdapter[JsValue, Long] = prism[Long](jsonNumber = num => Some(num.value.toLong))(JsNumber(_))
+    val jInt: PrismAdapter[JsValue, Int] = prism[JsValue, Int](asInt)(JsNumber(_))
+    val jShort: PrismAdapter[JsValue, Short] = prism[Short](jsonNumber = num => Some(num.value.toShort))(short => JsNumber(BigDecimal(short)))
+    val jByte: PrismAdapter[JsValue, Byte] = prism[Byte](jsonNumber = num => Some(num.value.toByte))(byte => JsNumber(BigDecimal(byte)))
 
-    val jObjectMap: Iso[JsObject, Map[String, JsValue]] =
-      Iso[JsObject, Map[String, JsValue]](_.value.toMap)(JsObject(_))
+    val jObjectMap: IsoAdapter[JsObject, Map[String, JsValue]] =
+      iso[JsObject, Map[String, JsValue]](_.value.toMap)(JsObject(_))
 
-    val jDescendants: Traversal[JsValue, JsValue] = new PTraversal[JsValue, JsValue, JsValue, JsValue] {
+    val jDescendants: TraversalAdapter[JsValue, JsValue] = TraversalAdapter(new Traversal[JsValue, JsValue] {
       override def modifyF[F[_]](f: JsValue => F[JsValue])(s: JsValue)(implicit F: scalaz.Applicative[F]): F[JsValue] =
         jsFold(F.pure(s), _ => F.pure(s), _ => F.pure(s), _ => F.pure(s),
           arr => F.map(Each.each[List[JsValue], JsValue].modifyF(f)(arr.value.toList))(JsArray(_): JsValue),
-          obj => F.map(jObjectValues.modifyF(f)(obj))(jsObject => jsObject: JsValue)
+          obj => F.map(jObjectValues.adapted.modifyF(f)(obj))(jsObject => jsObject: JsValue)
         )(s)
-    }
+    })
 
-    val jObjectValues: Traversal[JsObject, JsValue] = new PTraversal[JsObject, JsObject, JsValue, JsValue] {
+    val jObjectValues: TraversalAdapter[JsObject, JsValue] = TraversalAdapter(new PTraversal[JsObject, JsObject, JsValue, JsValue] {
       def modifyF[F[_]](f: JsValue => F[JsValue])(o: JsObject)(implicit F: Applicative[F]): F[JsObject] = {
         F.map(o.fields.toList.foldLeft(F.point(List[(String, JsValue)]())) {
           case (acc, (k, v)) => F.apply2(acc, f(v)) {
@@ -58,9 +61,9 @@ trait PlayJsonSPI {
           }
         })(elems => JsObject(elems.reverse))
       }
-    }
+    })
 
-    def filterObject(p: String => Boolean): Traversal[JsObject, JsValue] = {
+    def filterObject(p: String => Boolean): TraversalAdapter[JsObject, JsValue] = TraversalAdapter {
       new PTraversal[JsObject, JsObject, JsValue, JsValue] {
         import scalaz.std.list._
         import scalaz.syntax.applicative._
@@ -74,6 +77,24 @@ trait PlayJsonSPI {
           )(elems => JsObject(elems.reverse))
       }
     }
+
+    def idTraversal[A]: TraversalAdapter[A, A] =
+      TraversalAdapter(Traversal.id[A])
+
+    def listTraversal[A]: TraversalAdapter[List[A], A] =
+      TraversalAdapter(Each.each(Each.listEach))
+
+    def filterIndexTraversal[A](p: Int ⇒ Boolean): TraversalAdapter[List[A], A] =
+      TraversalAdapter(FilterIndex.filterIndex(p)(FilterIndex.listFilterIndex))
+
+    def optional[S, A](getOption: S ⇒ Option[A])(set: A ⇒ S ⇒ S): OptionalAdapter[S, A] =
+      OptionalAdapter(Optional(getOption)(set))
+
+    def prism[S, A](getOption: S ⇒ Option[A])(reverseGet: A ⇒ S): PrismAdapter[S, A] =
+      PrismAdapter(Prism(getOption)(reverseGet))
+
+    def iso[S, A](get: S => A)(reverseGet: A => S): IsoAdapter[S, A] =
+      IsoAdapter(Iso(get)(reverseGet))
 
     private def asBoolean:  JsValue => Option[Boolean]  = opt(jsonBool = Some(_))
     private def asString:   JsValue => Option[String]   = opt(jsonString = Some(_))
@@ -97,9 +118,9 @@ trait PlayJsonSPI {
       jsonString: String => Option[A] = (_: String) => None,
       jsonArray: JsArray => Option[A] = (_: JsArray) => None,
       jsonObject: JsObject => Option[A] = (_: JsObject) => None
-    )(jsonValue: A => JsValue): Prism[JsValue, A] = Prism[JsValue, A](
+    )(jsonValue: A => JsValue): PrismAdapter[JsValue, A] = PrismAdapter(Prism[JsValue, A](
       jsFold(jsonNull, jsonBool, jsonNumber, jsonString, jsonArray, jsonObject)
-    )(jsonValue)
+    )(jsonValue))
 
     private def jsFold[A](
       jsonNull: => A,
