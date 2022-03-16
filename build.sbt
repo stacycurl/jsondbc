@@ -2,7 +2,7 @@ import JsonDBC._
 import sbt.Keys._
 import sbt._
 
-lazy val root = (project in file(".")
+lazy val jsondbc = (project in file(".")
   aggregate(core, argonaut, circe, spray, json4s)
   settings(commonSettings: _*)
   settings(noPublish: _*)
@@ -14,7 +14,7 @@ lazy val core = (project in file("core")
     name := "jsondbc-core",
     libraryDependencies ++= List(
       "io.gatling"      %% "jsonpath"    % "0.6.8",
-      "org.reflections"  % "reflections" % "0.9.11",
+      "org.reflections"  % "reflections" % "0.9.11"
     )
   )
 )
@@ -25,10 +25,9 @@ lazy val scalazOptics = (project configure dependantProject("scalaz-optics", cor
     libraryDependencies ++= List(
       "io.argonaut"                %% "argonaut-monocle" % "6.3.3",
       "com.github.julien-truffaut" %% "monocle-core"     % "1.7.3",
-      "org.scalaz"                 %% "scalaz-core"      % "7.3.2",
+      "org.scalaz"                 %% "scalaz-core"      % "7.3.2"
     )
   )
-  settings(noPublish: _*)
 )
 
 lazy val catsOptics = (project configure dependantProject("cats-optics", core)
@@ -36,10 +35,9 @@ lazy val catsOptics = (project configure dependantProject("cats-optics", core)
   settings(
     libraryDependencies ++= List(
       "com.github.julien-truffaut" %% "monocle-core"     % "1.5.1-cats",
-      "org.typelevel"              %% "cats-core"        % "1.4.0",
+      "org.typelevel"              %% "cats-core"        % "1.4.0"
     )
   )
-  settings(noPublish: _*)
 )
 
 lazy val argonaut = (project configure dependantProject("argonaut", core, scalazOptics)
