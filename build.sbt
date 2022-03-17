@@ -3,7 +3,7 @@ import sbt.Keys._
 import sbt._
 
 lazy val jsondbc = (project in file(".")
-  aggregate(core, argonaut, circe, spray, json4s)
+  aggregate(core, scalazOptics, catsOptics, argonaut, circe, spray, json4s)
   settings(commonSettings: _*)
   settings(noPublish: _*)
 )
