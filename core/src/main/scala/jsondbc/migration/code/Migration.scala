@@ -13,8 +13,8 @@ import scala.reflect.ClassTag
 
 
 object Migration {
-  def migrations[J: SPI, M <: Migration[J] : ClassTag](prefix: String)(implicit resolver: ClassResolver): List[M] =
-    klassOf[M].implementationsIn(prefix).map(resolver.resolve[M])
+  def migrations[J: SPI, M <: Migration[J]: ClassTag: Ordering](prefix: String)(implicit resolver: ClassResolver): List[M] =
+    klassOf[M].implementationsIn(prefix).map(resolver.resolve[M]).sorted
 }
 
 /**
@@ -42,6 +42,9 @@ abstract class Migration[J](val enabled: Boolean)(implicit protected val spi: SP
   def id: MigrationId =
     MigrationId(getClass.getSimpleName.stripSuffix("$"))
 
+  def isAfter(name: String): Boolean =
+    id.name > name
+
   override def toString: String =
     getClass.getName.stripSuffix("$")
 
@@ -52,6 +55,9 @@ abstract class Migration[J](val enabled: Boolean)(implicit protected val spi: SP
 
   protected def update(value: J): MigrationResult[J] =
     MigrationResult.Update(value)
+
+  protected def unchanged(value: J): MigrationResult[J] =
+    MigrationResult.Unchanged(value)
 
   protected def failed(error: String): MigrationResult[J] =
     MigrationResult.Failed(error)
